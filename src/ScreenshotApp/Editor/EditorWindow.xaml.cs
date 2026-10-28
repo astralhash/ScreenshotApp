@@ -64,7 +64,9 @@ public sealed partial class EditorWindow : Window
         ViewModel = new EditorViewModel(settings, store, PickSavePathAsync);
         ViewModel.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(EditorViewModel.SelectedShot)) SwitchDocument(ViewModel.SelectedShot);
+            if (e.PropertyName != nameof(EditorViewModel.SelectedShot)) return;
+            SwitchDocument(ViewModel.SelectedShot);
+            if (ViewModel.SelectedShot is { } shot) FilmStrip.ScrollIntoView(shot);
         };
         ViewModel.LastShotClosed += (_, _) =>
         {
@@ -787,6 +789,22 @@ public sealed partial class EditorWindow : Window
         {
             _hoveredClip = null;
             ViewModel.RemoveShot(hovered);
+            e.Handled = true;
+            return;
+        }
+        if (e.Key is VirtualKey.Left or VirtualKey.Right && ViewModel.SelectedShot is { } current
+            && !InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down)
+            && !InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Menu).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down))
+        {
+            // Film strip is newest-left, so Left = previous index.
+            int next = ViewModel.Shots.IndexOf(current) + (e.Key == VirtualKey.Left ? -1 : 1);
+            if (next >= 0 && next < ViewModel.Shots.Count) ViewModel.SelectedShot = ViewModel.Shots[next];
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == VirtualKey.Delete && ViewModel.Interaction.Selected is null && ViewModel.SelectedShot is { } open)
+        {
+            ViewModel.RemoveShot(open); // no annotation selected: Delete closes the open clip
             e.Handled = true;
             return;
         }
