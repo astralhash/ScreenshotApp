@@ -33,6 +33,9 @@ internal sealed class AppSettings
     /// <summary>Hide the editor while a new clip is captured (so it is not in the shot), then bring it back.</summary>
     public bool DuckEditorForCapture { get; set; } = true;
 
+    /// <summary>Shows features still being tried out (currently "Share Region…" in the tray menu).</summary>
+    public bool ExperimentalFeatures { get; set; }
+
     /// <summary>Whether the region-capture zoom lens (Z) was on; remembered from capture to capture.</summary>
     public bool ZoomLensEnabled { get; set; }
 

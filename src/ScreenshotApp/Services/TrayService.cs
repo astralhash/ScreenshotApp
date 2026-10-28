@@ -87,13 +87,18 @@ internal sealed unsafe class TrayService : IDisposable
             Append(menu, TrayCommand.CaptureRegion, "Capture Region");
             Append(menu, TrayCommand.CaptureWindow, "Capture Window");
             Append(menu, TrayCommand.CaptureFullScreen, "Capture Full Screen");
-            PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (string?)null);
+            // Experimental. A share that is running can always be changed or stopped, even if the setting was turned off.
             if (Sharing)
             {
+                PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (string?)null);
                 Append(menu, TrayCommand.ChangeSharedRegion, "Change Shared Region…");
                 Append(menu, TrayCommand.StopSharing, "Stop Sharing Region");
             }
-            else Append(menu, TrayCommand.ShareRegion, "Share Region…");
+            else if (App.Settings.Current.ExperimentalFeatures)
+            {
+                PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (string?)null);
+                Append(menu, TrayCommand.ShareRegion, "Share Region…");
+            }
             PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (string?)null);
             Append(menu, TrayCommand.Settings, "Settings");
             PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (string?)null);

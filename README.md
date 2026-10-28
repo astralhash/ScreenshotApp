@@ -25,6 +25,11 @@ Built with C#, .NET 10 and WinUI 3 (Windows App SDK). It is unpackaged, so there
 - Undo / redo, a "Clean" button that restores the original capture, zoom and pan, Mica backdrop, light/dark following the system.
 - Copy and Save flatten the image at full pixel resolution (rendered with Win2D, not screen-scaled).
 
+**Experimental** (turn on *Settings → General → Enable experimental features*)
+- **Share Region…** in the tray menu: pick a screen region and it is mirrored live into a hidden window called
+  "Shared region". Apps that can share a window but not part of the screen, like Microsoft Teams, list it in their
+  window picker. A thin red frame marks the shared area; change or stop it from the tray menu.
+
 ## Hotkeys
 
 | Default | Action |

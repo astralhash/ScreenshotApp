@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+- Experimental: **Share Region…** (tray menu) mirrors a screen region live into a hidden "Shared region" window, so apps that can only share whole windows, like Microsoft Teams, can share just that region. A red frame marks the area; change or stop it from the tray. Turn it on with the new *Enable experimental features* setting under General.
+- Window capture now grabs the clicked window itself: windows in front of it are no longer in the shot, and its rounded corners are filled from the screen behind it.
+- Settings has an About section with the version and a link to the GitHub page.
+
 ## 0.2.0
 
 - Moved from .NET 8 to .NET 10 (runtime 10.0.14). The portable release zip is self-contained, so nothing extra needs installing; building from source needs the .NET 10 SDK.
