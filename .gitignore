@@ -1,0 +1,40 @@
+## .NET / Visual Studio
+bin/
+obj/
+publish/
+.vs/
+*.user
+*.suo
+*.userprefs
+*.rsuser
+
+## Build and test output
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+ARM64/
+*.log
+TestResults/
+artifacts/
+
+## NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+
+## Rider / VS Code
+.idea/
+.vscode/
+
+## OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+## Local tooling state
+.claude/settings.local.json
+
+# Claude Code project instructions
+CLAUDE.md
