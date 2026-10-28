@@ -16,6 +16,7 @@ internal sealed class CaptureOverlay
     private const int MinSelection = 3;
 
     private readonly OverlayMode _mode;
+    private readonly bool _lensAllowed;
     private readonly TaskCompletionSource<CapturedImage?> _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly List<OverlayWindow> _overlays = new();
     private CapturedImage _frozen = null!;
@@ -37,10 +38,13 @@ internal sealed class CaptureOverlay
     /// <summary>True after C copied the colour; cleared when the cursor moves.</summary>
     public bool ColorCopied { get; private set; }
 
-    public CaptureOverlay(OverlayMode mode)
+    /// <param name="allowLens">False to keep the zoom lens off (and Z inert) whatever the saved setting, e.g. when
+    /// the overlay only picks a region to share.</param>
+    public CaptureOverlay(OverlayMode mode, bool allowLens = true)
     {
         _mode = mode;
-        LensEnabled = mode == OverlayMode.Region && App.Settings.Current.ZoomLensEnabled;
+        _lensAllowed = mode == OverlayMode.Region && allowLens;
+        LensEnabled = _lensAllowed && App.Settings.Current.ZoomLensEnabled;
     }
 
     public Task<CapturedImage?> RunAsync()
@@ -118,7 +122,7 @@ internal sealed class CaptureOverlay
 
     public void ToggleLens()
     {
-        if (_mode != OverlayMode.Region) return;
+        if (!_lensAllowed) return;
         LensEnabled = !LensEnabled;
         App.Settings.Current.ZoomLensEnabled = LensEnabled;
         try { App.Settings.Save(); }

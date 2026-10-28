@@ -381,7 +381,7 @@ public partial class App : Application
         if (CaptureOverlay.IsActive) return null;
         try
         {
-            var image = await new CaptureOverlay(OverlayMode.Region).RunAsync();
+            var image = await new CaptureOverlay(OverlayMode.Region, allowLens: false).RunAsync();
             return image is null ? null : new System.Drawing.Rectangle(image.ScreenX, image.ScreenY, image.Width, image.Height);
         }
         catch (Exception ex)
