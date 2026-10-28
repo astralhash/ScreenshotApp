@@ -20,7 +20,6 @@ internal sealed partial class EditorViewModel : ObservableObject
     public ObservableCollection<EditorDocument> Shots { get; } = new();
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Title))]
     private EditorDocument? _selectedShot;
 
     [ObservableProperty] private string _statusText = "";
@@ -114,11 +113,24 @@ internal sealed partial class EditorViewModel : ObservableObject
     [RelayCommand]
     private void CancelCrop() => Tool = ToolKind.Select;
 
-    // Each drawing tool remembers its own width (persisted in settings). Select has none.
+    // Each drawing tool remembers its own width and colour (persisted in settings). Select has none.
     private readonly Dictionary<ToolKind, double> _toolWidths = new();
+    private readonly Dictionary<ToolKind, Color> _toolColors = new();
     private readonly DispatcherQueueTimer _widthSaveTimer;
 
     private static double DefaultWidth(ToolKind tool) => tool == ToolKind.Highlighter ? 24 : 6;
+    private static Color DefaultColor(ToolKind tool) => tool == ToolKind.Text ? Palette[6] : Palette[0];
+
+    private static string ColorToString(Color c) => $"#{c.A:X2}{c.R:X2}{c.G:X2}{c.B:X2}";
+
+    private static bool TryParseColor(string? s, out Color color)
+    {
+        color = default;
+        if (s is not { Length: 9 } || s[0] != '#' ||
+            !uint.TryParse(s.AsSpan(1), System.Globalization.NumberStyles.HexNumber, null, out uint v)) return false;
+        color = Color.FromArgb((byte)(v >> 24), (byte)(v >> 16), (byte)(v >> 8), (byte)v);
+        return true;
+    }
 
     partial void OnToolChanged(ToolKind value)
     {
@@ -129,11 +141,22 @@ internal sealed partial class EditorViewModel : ObservableObject
         // Switching tools must not restyle whatever shape is currently selected.
         _syncingStyle = true;
         StrokeWidth = width;
+        StrokeColor = _toolColors[value];
         _syncingStyle = false;
         Interaction.StrokeWidth = (float)width;
+        Interaction.StrokeColor = StrokeColor;
     }
 
-    partial void OnStrokeColorChanged(Color value) => PushStyle();
+    partial void OnStrokeColorChanged(Color value)
+    {
+        if (!_syncingStyle && _toolColors.ContainsKey(Tool))
+        {
+            _toolColors[Tool] = value;
+            _widthSaveTimer.Stop();
+            _widthSaveTimer.Start();
+        }
+        PushStyle();
+    }
 
     partial void OnStrokeWidthChanged(double value)
     {
@@ -148,11 +171,12 @@ internal sealed partial class EditorViewModel : ObservableObject
 
     partial void OnFillShapesChanged(bool value) => PushStyle();
 
-    private void SaveToolWidths()
+    private void SaveToolStyles()
     {
         try
         {
             _settings.Current.ToolWidths = _toolWidths.ToDictionary(kv => kv.Key.ToString(), kv => kv.Value);
+            _settings.Current.ToolColors = _toolColors.ToDictionary(kv => kv.Key.ToString(), kv => ColorToString(kv.Value));
             _settings.Save();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -209,7 +233,6 @@ internal sealed partial class EditorViewModel : ObservableObject
         if (SelectedShot is { } shot) shot.Dirty = true; // edited since last save
         _store.ScheduleSave();
         RefreshUndoRedo();
-        OnPropertyChanged(nameof(Title)); // a crop changes the output size
         Interaction.RaiseChanged();
     }
 
@@ -236,7 +259,7 @@ internal sealed partial class EditorViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanRedo))]
     private void Redo() => SelectedShot?.Commands.Redo();
 
-    public string Title => SelectedShot is { } s ? $"Screenshot  ·  {s.OutputWidth} × {s.OutputHeight}" : "Screenshot";
+    public string Title => "ScreenshotApp Editor";
     /// <summary>With no clips the editor shows its start page (open a file or capture) instead of the tools.</summary>
     public bool HasShots => Shots.Count > 0;
     public bool IsEmpty => Shots.Count == 0;
@@ -262,7 +285,7 @@ internal sealed partial class EditorViewModel : ObservableObject
         _widthSaveTimer = DispatcherQueue.GetForCurrentThread().CreateTimer();
         _widthSaveTimer.Interval = TimeSpan.FromMilliseconds(600);
         _widthSaveTimer.IsRepeating = false;
-        _widthSaveTimer.Tick += (_, _) => SaveToolWidths();
+        _widthSaveTimer.Tick += (_, _) => SaveToolStyles();
 
         foreach (var tool in Enum.GetValues<ToolKind>().Where(t => t is not (ToolKind.Select or ToolKind.Crop)))
         {
@@ -270,6 +293,10 @@ internal sealed partial class EditorViewModel : ObservableObject
                 ? Math.Clamp(saved, 1, 40)
                 : DefaultWidth(tool);
             _toolWidths[tool] = width;
+            _toolColors[tool] = settings.Current.ToolColors.TryGetValue(tool.ToString(), out string? savedColor) &&
+                                TryParseColor(savedColor, out var color)
+                ? color
+                : DefaultColor(tool);
         }
         OnToolChanged(Tool); // load the starting tool's width into the slider and interaction
     }

@@ -69,7 +69,7 @@ public sealed partial class EditorWindow : Window
         InitializeComponent();
 
         _hwnd = WindowNative.GetWindowHandle(this);
-        Title = "Screenshot";
+        Title = "ScreenshotApp Editor";
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(TitleBar);
         AppWindow.TitleBar.ButtonBackgroundColor = Colors.Transparent;

@@ -33,6 +33,9 @@ internal sealed class AppSettings
 
     /// <summary>Last stroke width per drawing tool, keyed by tool name. Missing tools use the defaults.</summary>
     public Dictionary<string, double> ToolWidths { get; set; } = new();
+
+    /// <summary>Last colour per drawing tool as "#AARRGGBB", keyed by tool name. Missing tools use the defaults.</summary>
+    public Dictionary<string, string> ToolColors { get; set; } = new();
 }
 
 /// <summary>Loads/saves <see cref="AppSettings"/> as JSON in %AppData%\ScreenshotApp.</summary>
