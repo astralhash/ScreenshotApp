@@ -146,6 +146,17 @@
                                       IsOn="{x:Bind ViewModel.CloseEditorWhenEmpty, Mode=TwoWay}" />
                     </StackPanel>
                 </Border>
+
+                <!-- About -->
+                <TextBlock Text="About" Style="{StaticResource SectionHeader}" />
+                <Border Style="{StaticResource Card}">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="ScreenshotApp" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                        <TextBlock Style="{StaticResource Hint}" Text="{x:Bind ViewModel.VersionText}" IsTextSelectionEnabled="True" />
+                        <HyperlinkButton Content="github.com/astralhash/ScreenshotApp" Margin="-12,4,0,0"
+                                         NavigateUri="https://github.com/astralhash/ScreenshotApp" />
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </ScrollViewer>
     </Grid>

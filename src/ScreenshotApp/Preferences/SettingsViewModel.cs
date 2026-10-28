@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Runtime.InteropServices;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.UI.Xaml;
 using ScreenshotApp.Services;
@@ -153,6 +155,20 @@ internal sealed partial class SettingsViewModel : ObservableObject
         HotkeyMessage = failed.Count == 0
             ? ""
             : "Already used by another app, so it will not work: " + string.Join("; ", failed);
+    }
+
+    /// <summary>App version (without the git commit suffix the SDK appends), architecture and .NET runtime.</summary>
+    public string VersionText { get; } = BuildVersionText();
+
+    private static string BuildVersionText()
+    {
+        var asm = typeof(SettingsViewModel).Assembly;
+        string version = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+            ?? asm.GetName().Version?.ToString() ?? "?";
+        int plus = version.IndexOf('+');
+        if (plus >= 0) version = version[..plus];
+        string arch = RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant();
+        return $"Version {version} ({arch}) · .NET {Environment.Version}";
     }
 
     /// <summary>A capture would go nowhere.</summary>
