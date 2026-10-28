@@ -102,3 +102,4 @@ GetCursorInfo
 CURSORINFO
 GetIconInfo
 DrawIconEx
+GetWindowRect

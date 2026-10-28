@@ -20,7 +20,8 @@ internal sealed class CaptureOverlay
     private readonly List<OverlayWindow> _overlays = new();
     private CapturedImage _frozen = null!;
     private Rectangle _virtual;
-    private List<Rectangle> _windows = new();
+    private List<WindowInfo> _windows = new();
+    private int _hoverIndex = -1; // index into _windows of the window under the cursor (window mode)
     private Point? _dragStart;
     private bool _done;
 
@@ -48,7 +49,7 @@ internal sealed class CaptureOverlay
         try
         {
             // Enumerate windows first: the overlays are about to cover everything.
-            if (_mode == OverlayMode.Window) _windows = WindowEnumerator.GetVisibleWindowBounds();
+            if (_mode == OverlayMode.Window) _windows = WindowEnumerator.GetVisibleWindows();
             _virtual = Monitors.VirtualScreen;
             _frozen = ScreenCapture.CaptureRect(_virtual);
 
@@ -153,7 +154,9 @@ internal sealed class CaptureOverlay
     public void Confirm()
     {
         if (_done) return;
-        if (Selection is { } sel && sel.Width >= 1 && sel.Height >= 1) Finish(Crop(sel));
+        if (Selection is not { Width: >= 1, Height: >= 1 } sel) return;
+        if (_mode == OverlayMode.Window && _hoverIndex >= 0) FinishWindow(sel, _hoverIndex);
+        else Finish(Crop(sel));
     }
 
     public void Cancel()
@@ -166,11 +169,16 @@ internal sealed class CaptureOverlay
     private void UpdateHover()
     {
         Selection = null;
-        foreach (var w in _windows)
+        _hoverIndex = -1;
+        for (int i = 0; i < _windows.Count; i++)
         {
-            if (!w.Contains(Cursor)) continue;
-            var r = Rectangle.Intersect(w, _virtual);
-            if (!r.IsEmpty) Selection = r;
+            if (!_windows[i].Bounds.Contains(Cursor)) continue;
+            var r = Rectangle.Intersect(_windows[i].Bounds, _virtual);
+            if (!r.IsEmpty)
+            {
+                Selection = r;
+                _hoverIndex = i;
+            }
             return;
         }
     }
@@ -203,6 +211,27 @@ internal sealed class CaptureOverlay
             Buffer.BlockCopy(_frozen.Pixels, srcOffset, pixels, y * w * 4, w * 4);
         }
         return new CapturedImage(pixels, w, h, sel.X, sel.Y);
+    }
+
+    /// <summary>
+    /// Window mode: grabs the window itself (Windows.Graphics.Capture), so windows in front of it are not in
+    /// the shot. Falls back to the frozen screen when that is unavailable or fails.
+    /// </summary>
+    private async void FinishWindow(Rectangle sel, int index)
+    {
+        _done = true;
+        Teardown();
+        var frozen = Crop(sel);
+        CapturedImage? image = null;
+        try
+        {
+            // Windows above the target in z-order: the frozen pixels there are not what lies behind the window.
+            var occluders = _windows.Take(index).Select(w => Rectangle.Intersect(w.Bounds, sel))
+                .Where(r => !r.IsEmpty).ToList();
+            image = await WindowCapture.TryCaptureAsync(_windows[index].Handle, frozen, occluders);
+        }
+        catch (Exception ex) { Log.Error(ex); }
+        _tcs.TrySetResult(image ?? frozen);
     }
 
     private void Finish(CapturedImage? result)
