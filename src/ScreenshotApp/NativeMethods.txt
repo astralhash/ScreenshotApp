@@ -98,3 +98,7 @@ StretchBlt
 SetStretchBltMode
 STRETCH_BLT_MODE
 SetCursorPos
+GetCursorInfo
+CURSORINFO
+GetIconInfo
+DrawIconEx

@@ -39,6 +39,7 @@ internal sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _launchAtStartup;
     [ObservableProperty] private bool _autoCopyOnClose;
     [ObservableProperty] private bool _confirmRemoveAll;
+    [ObservableProperty] private bool _captureCursor;
 
     public IReadOnlyList<HotkeyRow> Hotkeys { get; } = HotkeyActions.All.Select(a => new HotkeyRow(a)).ToList();
 
@@ -66,6 +67,7 @@ internal sealed partial class SettingsViewModel : ObservableObject
         LaunchAtStartup = s.LaunchAtStartup;
         AutoCopyOnClose = s.AutoCopyOnClose;
         ConfirmRemoveAll = s.ConfirmRemoveAll;
+        CaptureCursor = s.CaptureCursor;
         _loading = false;
     }
 
@@ -173,6 +175,7 @@ internal sealed partial class SettingsViewModel : ObservableObject
     partial void OnLaunchAtStartupChanged(bool value) => Changed();
     partial void OnAutoCopyOnCloseChanged(bool value) => Changed();
     partial void OnConfirmRemoveAllChanged(bool value) => Changed();
+    partial void OnCaptureCursorChanged(bool value) => Changed();
 
     private void Changed()
     {
@@ -192,6 +195,7 @@ internal sealed partial class SettingsViewModel : ObservableObject
         s.ImageFormat = FormatIndex == 1 ? "jpg" : "png";
         s.AutoCopyOnClose = AutoCopyOnClose;
         s.ConfirmRemoveAll = ConfirmRemoveAll;
+        s.CaptureCursor = CaptureCursor;
 
         if (s.LaunchAtStartup != LaunchAtStartup)
         {

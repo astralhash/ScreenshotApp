@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.Graphics.Gdi;
+using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace ScreenshotApp.Capture;
 
@@ -47,6 +48,27 @@ internal static unsafe class ScreenCapture
 
     public static CapturedImage CaptureMonitorUnderCursor() => CaptureRect(GetMonitorUnderCursor());
 
+    /// <summary>Draws the current mouse cursor (if visible) onto <paramref name="dc"/>, which holds the pixels of <paramref name="area"/>.</summary>
+    private static void DrawCursor(HDC dc, Rectangle area)
+    {
+        var ci = new CURSORINFO { cbSize = (uint)sizeof(CURSORINFO) };
+        if (!PInvoke.GetCursorInfo(ref ci) || (ci.flags & CURSORINFO_FLAGS.CURSOR_SHOWING) == 0 || ci.hCursor.IsNull)
+            return;
+        if (!PInvoke.GetIconInfo(new HICON(ci.hCursor.Value), out var info)) return;
+        try
+        {
+            int x = ci.ptScreenPos.X - (int)info.xHotspot - area.X;
+            int y = ci.ptScreenPos.Y - (int)info.yHotspot - area.Y;
+            PInvoke.DrawIconEx(dc, x, y, new HICON(ci.hCursor.Value), 0, 0, 0, HBRUSH.Null,
+                DI_FLAGS.DI_NORMAL);
+        }
+        finally
+        {
+            if (!info.hbmMask.IsNull) PInvoke.DeleteObject(info.hbmMask);
+            if (!info.hbmColor.IsNull) PInvoke.DeleteObject(info.hbmColor);
+        }
+    }
+
     public static CapturedImage CaptureRect(Rectangle area)
     {
         int w = area.Width, h = area.Height;
@@ -74,6 +96,8 @@ internal static unsafe class ScreenCapture
                 if (!PInvoke.BitBlt(memDc, 0, 0, w, h, screenDc, area.X, area.Y,
                         ROP_CODE.SRCCOPY | ROP_CODE.CAPTUREBLT))
                     throw new InvalidOperationException("BitBlt failed.");
+
+                if (App.Settings.Current.CaptureCursor) DrawCursor(memDc, area);
 
                 var pixels = new byte[w * h * 4];
                 Marshal.Copy((IntPtr)bits, pixels, 0, pixels.Length);

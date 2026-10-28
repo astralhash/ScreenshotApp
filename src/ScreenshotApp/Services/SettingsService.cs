@@ -24,6 +24,9 @@ internal sealed class AppSettings
     public bool LaunchAtStartup { get; set; }
     public bool AutoCopyOnClose { get; set; }
 
+    /// <summary>Draw the mouse cursor into captures.</summary>
+    public bool CaptureCursor { get; set; }
+
     /// <summary>Ask before "Remove all clips" (the dialog has a "don't ask again" checkbox).</summary>
     public bool ConfirmRemoveAll { get; set; } = true;
 

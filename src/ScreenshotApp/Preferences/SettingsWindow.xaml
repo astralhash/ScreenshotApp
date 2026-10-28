@@ -127,6 +127,8 @@
                 <TextBlock Text="General" Style="{StaticResource SectionHeader}" />
                 <Border Style="{StaticResource Card}">
                     <StackPanel Spacing="14">
+                        <ToggleSwitch Header="Include the mouse cursor in captures" OnContent="On" OffContent="Off"
+                                      IsOn="{x:Bind ViewModel.CaptureCursor, Mode=TwoWay}" />
                         <ToggleSwitch Header="Launch at Windows startup" OnContent="On" OffContent="Off"
                                       IsOn="{x:Bind ViewModel.LaunchAtStartup, Mode=TwoWay}" />
                         <ToggleSwitch Header="Copy the current clip to the clipboard when the editor is closed" OnContent="On" OffContent="Off"
