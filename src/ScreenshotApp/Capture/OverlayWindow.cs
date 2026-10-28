@@ -160,6 +160,7 @@ internal sealed unsafe class OverlayWindow : IDisposable
                 if (wParam.Value == (nuint)VIRTUAL_KEY.VK_ESCAPE) _owner.Cancel();
                 else if (wParam.Value == (nuint)VIRTUAL_KEY.VK_RETURN) _owner.Confirm();
                 else if (wParam.Value == (nuint)VIRTUAL_KEY.VK_Z) _owner.ToggleLens();
+                else if (wParam.Value == (nuint)VIRTUAL_KEY.VK_C) _owner.CopyColor();
                 else if (wParam.Value == (nuint)VIRTUAL_KEY.VK_LEFT || wParam.Value == (nuint)VIRTUAL_KEY.VK_A) _owner.Nudge(-1, 0);
                 else if (wParam.Value == (nuint)VIRTUAL_KEY.VK_RIGHT || wParam.Value == (nuint)VIRTUAL_KEY.VK_D) _owner.Nudge(1, 0);
                 else if (wParam.Value == (nuint)VIRTUAL_KEY.VK_UP || wParam.Value == (nuint)VIRTUAL_KEY.VK_W) _owner.Nudge(0, -1);
@@ -346,6 +347,7 @@ internal sealed unsafe class OverlayWindow : IDisposable
         // Readout: screen position, colour under the cursor, and the selection size while dragging.
         byte* px = (byte*)_brightBits + ((long)cy * w + cx) * 4;
         string text = $"{cursor.X}, {cursor.Y}   #{px[2]:X2}{px[1]:X2}{px[0]:X2}";
+        if (_owner.ColorCopied) text += " (copied)";
         if (_owner.Selection is { Width: > 0, Height: > 0 } sel) text += $"   {sel.Width} × {sel.Height}";
         var (bw, bh) = MeasurePill(text);
         int tx = Math.Clamp(lx, 0, Math.Max(0, w - bw));

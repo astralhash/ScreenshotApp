@@ -118,7 +118,7 @@
                                        Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
                                        Text="Tip: press Z during a region capture to toggle a zoom lens for pixel-precise selection." />
                             <TextBlock Style="{StaticResource Hint}"
-                                       Text="Arrow keys or W A S D move the cursor one pixel. Esc cancels." />
+                                       Text="Arrow keys or W A S D move the cursor one pixel. With the zoom lens on, C copies the color under the cursor (#RRGGBB). Esc cancels." />
                         </StackPanel>
                     </StackPanel>
                 </Border>

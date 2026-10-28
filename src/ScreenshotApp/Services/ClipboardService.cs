@@ -14,6 +14,7 @@ namespace ScreenshotApp.Services;
 internal static class ClipboardService
 {
     private const uint CF_DIB = 8;
+    private const uint CF_UNICODETEXT = 13;
 
     /// <summary>The clipboard owner; set once at startup to the hidden message window.</summary>
     public static HWND Owner { get; set; }
@@ -23,6 +24,26 @@ internal static class ClipboardService
     {
         png ??= await ImageSaver.EncodeAsync(image, jpg: false);
         SetClipboard(image, png);
+    }
+
+    public static void CopyText(string text) => SetText(text);
+
+    private static unsafe void SetText(string text)
+    {
+        bool opened = false;
+        for (int i = 0; i < 20 && !(opened = PInvoke.OpenClipboard(Owner)); i++)
+            Thread.Sleep(25);
+        if (!opened) throw new IOException("The clipboard is busy.");
+
+        try
+        {
+            PInvoke.EmptyClipboard();
+            PutGlobal(CF_UNICODETEXT, System.Text.Encoding.Unicode.GetBytes(text + "\0"));
+        }
+        finally
+        {
+            PInvoke.CloseClipboard();
+        }
     }
 
     private static unsafe void SetClipboard(CapturedImage image, byte[] png)

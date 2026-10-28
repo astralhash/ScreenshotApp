@@ -33,6 +33,9 @@ internal sealed class CaptureOverlay
     /// <summary>The Z-key magnifier (region capture only).</summary>
     public bool LensEnabled { get; private set; }
 
+    /// <summary>True after C copied the colour; cleared when the cursor moves.</summary>
+    public bool ColorCopied { get; private set; }
+
     public CaptureOverlay(OverlayMode mode)
     {
         _mode = mode;
@@ -73,7 +76,9 @@ internal sealed class CaptureOverlay
 
     public void OnMouseMove(Point p)
     {
+        var moved = Clamp(p) != Cursor;
         Cursor = Clamp(p);
+        if (moved) ColorCopied = false;
         if (_mode == OverlayMode.Window) UpdateHover();
         else if (_dragStart is { } start) Selection = Normalize(start, Cursor);
         InvalidateAll();
@@ -116,6 +121,21 @@ internal sealed class CaptureOverlay
         LensEnabled = !LensEnabled;
         App.Settings.Current.ZoomLensEnabled = LensEnabled;
         try { App.Settings.Save(); }
+        catch (Exception ex) { Log.Error(ex); }
+        InvalidateAll();
+    }
+
+    /// <summary>Copies the colour under the cursor as #RRGGBB (lens only).</summary>
+    public void CopyColor()
+    {
+        if (_mode != OverlayMode.Region || !LensEnabled) return;
+        int i = ((Cursor.Y - _frozen.ScreenY) * _frozen.Width + (Cursor.X - _frozen.ScreenX)) * 4;
+        var px = _frozen.Pixels;
+        try
+        {
+            ClipboardService.CopyText($"#{px[i + 2]:X2}{px[i + 1]:X2}{px[i]:X2}");
+            ColorCopied = true;
+        }
         catch (Exception ex) { Log.Error(ex); }
         InvalidateAll();
     }
