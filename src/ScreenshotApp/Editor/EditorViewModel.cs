@@ -20,10 +20,10 @@ internal sealed partial class EditorViewModel : ObservableObject
     public ObservableCollection<EditorDocument> Shots { get; } = new();
 
     [ObservableProperty]
-    private EditorDocument? _selectedShot;
+    public partial EditorDocument? SelectedShot { get; set; }
 
-    [ObservableProperty] private string _statusText = "";
-    [ObservableProperty] private string _zoomText = "100%";
+    [ObservableProperty] public partial string StatusText { get; set; } = "";
+    [ObservableProperty] public partial string ZoomText { get; set; } = "100%";
 
     /// <summary>Tool and selection logic; the window feeds it pointer input in image coordinates.</summary>
     public EditorInteraction Interaction { get; } = new();
@@ -40,23 +40,23 @@ internal sealed partial class EditorViewModel : ObservableObject
         Color.FromArgb(255, 255, 255, 255), // white
     };
 
-    [ObservableProperty] private ToolKind _tool = ToolKind.Arrow;
-    [ObservableProperty] private Color _strokeColor = Palette[0];
-    [ObservableProperty] private double _strokeWidth = DefaultWidth(ToolKind.Arrow);
-    [ObservableProperty] private bool _fillShapes;
+    [ObservableProperty] public partial ToolKind Tool { get; set; } = ToolKind.Arrow;
+    [ObservableProperty] public partial Color StrokeColor { get; set; } = Palette[0];
+    [ObservableProperty] public partial double StrokeWidth { get; set; } = DefaultWidth(ToolKind.Arrow);
+    [ObservableProperty] public partial bool FillShapes { get; set; }
 
-    [ObservableProperty] private BlurMode _blurMode = BlurMode.Pixelate;
+    [ObservableProperty] public partial BlurMode BlurMode { get; set; } = BlurMode.Pixelate;
 
     // What the properties bar shows depends on the active tool (or the selected shape).
-    [ObservableProperty] private bool _isCropTool;
-    [ObservableProperty] private bool _showStyle = true;
-    [ObservableProperty] private bool _showFill = true;
-    [ObservableProperty] private bool _showBlurMode;
-    [ObservableProperty] private string _widthLabel = "Width";
+    [ObservableProperty] public partial bool IsCropTool { get; set; }
+    [ObservableProperty] public partial bool ShowStyle { get; set; } = true;
+    [ObservableProperty] public partial bool ShowFill { get; set; } = true;
+    [ObservableProperty] public partial bool ShowBlurMode { get; set; }
+    [ObservableProperty] public partial string WidthLabel { get; set; } = "Width";
 
     // Colour only matters for Solid redaction; strength only for Pixelate/Blur.
-    [ObservableProperty] private bool _showColor = true;
-    [ObservableProperty] private bool _showWidth = true;
+    [ObservableProperty] public partial bool ShowColor { get; set; } = true;
+    [ObservableProperty] public partial bool ShowWidth { get; set; } = true;
 
     public bool IsPixelate => BlurMode == BlurMode.Pixelate;
     public bool IsBlur => BlurMode == BlurMode.Blur;

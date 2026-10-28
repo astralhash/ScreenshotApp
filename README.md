@@ -3,7 +3,7 @@
 A small, modern screenshot tool for Windows 11. It lives in the notification area: press a hotkey, capture the
 full screen, a window or a region, and land in a clean editor to annotate, copy or save.
 
-Built with C#, .NET 8 and WinUI 3 (Windows App SDK). It is unpackaged, so there is no installer and nothing to register.
+Built with C#, .NET 10 and WinUI 3 (Windows App SDK). It is unpackaged, so there is no installer and nothing to register.
 
 ## Features
 
@@ -57,8 +57,8 @@ If **Print Screen** does nothing, Windows may still hand it to the Snipping Tool
 ## Requirements
 
 - Windows 10 1809 or newer (built and tested on Windows 11), x64.
-- To build: the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0).
-- To run a normal build: the .NET 8 runtime. A self-contained publish needs nothing.
+- To build: the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
+- To run a normal build: the .NET 10 runtime. A self-contained publish needs nothing.
 
 ## Download
 
@@ -70,7 +70,7 @@ unzip `ScreenshotApp-<version>-win-x64.zip` anywhere and run `ScreenshotApp.exe`
 
 ```powershell
 dotnet build src/ScreenshotApp -p:Platform=x64
-src\ScreenshotApp\bin\x64\Debug\net8.0-windows10.0.19041.0\ScreenshotApp.exe
+src\ScreenshotApp\bin\x64\Debug\net10.0-windows10.0.19041.0\ScreenshotApp.exe
 ```
 
 Optional launch switches: `--open-editor` and `--open-settings` open that window at start.

@@ -13,8 +13,8 @@ internal sealed partial class HotkeyRow : ObservableObject
     public HotkeyAction Action { get; }
     public string Label => HotkeyActions.Label(Action);
 
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(Text))] private string _assigned = "";
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(Text))] private bool _recording;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(Text))] public partial string Assigned { get; set; } = "";
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(Text))] public partial bool Recording { get; set; }
 
     public string Text => Recording ? "Press the keys…" : Assigned.Length == 0 ? "Not set" : Assigned;
     public bool CanClear => Assigned.Length > 0;
@@ -28,23 +28,23 @@ internal sealed partial class SettingsViewModel : ObservableObject
     private readonly SettingsService _service;
     private bool _loading = true;
 
-    [ObservableProperty] private bool _targetEditor;
-    [ObservableProperty] private bool _targetClipboard;
-    [ObservableProperty] private bool _targetFile;
+    [ObservableProperty] public partial bool TargetEditor { get; set; }
+    [ObservableProperty] public partial bool TargetClipboard { get; set; }
+    [ObservableProperty] public partial bool TargetFile { get; set; }
 
-    [ObservableProperty] private string _saveFolder = "";
-    [ObservableProperty] private string _filenamePattern = "";
-    [ObservableProperty] private int _formatIndex;
+    [ObservableProperty] public partial string SaveFolder { get; set; } = "";
+    [ObservableProperty] public partial string FilenamePattern { get; set; } = "";
+    [ObservableProperty] public partial int FormatIndex { get; set; }
 
-    [ObservableProperty] private bool _launchAtStartup;
-    [ObservableProperty] private bool _confirmRemoveAll;
-    [ObservableProperty] private bool _closeEditorWhenEmpty;
-    [ObservableProperty] private bool _duckEditorForCapture;
-    [ObservableProperty] private bool _captureCursor;
+    [ObservableProperty] public partial bool LaunchAtStartup { get; set; }
+    [ObservableProperty] public partial bool ConfirmRemoveAll { get; set; }
+    [ObservableProperty] public partial bool CloseEditorWhenEmpty { get; set; }
+    [ObservableProperty] public partial bool DuckEditorForCapture { get; set; }
+    [ObservableProperty] public partial bool CaptureCursor { get; set; }
 
     public IReadOnlyList<HotkeyRow> Hotkeys { get; } = HotkeyActions.All.Select(a => new HotkeyRow(a)).ToList();
 
-    [ObservableProperty] private string _hotkeyMessage = "";
+    [ObservableProperty] public partial string HotkeyMessage { get; set; } = "";
 
     private HotkeyRow? _recordingRow;
 
