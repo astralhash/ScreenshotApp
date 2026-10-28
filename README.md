@@ -103,7 +103,10 @@ src/ScreenshotApp/
 All Win32 interop goes through [CsWin32](https://github.com/microsoft/CsWin32), the editor canvas and export through
 [Win2D](https://github.com/microsoft/Win2D), and MVVM through the
 [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet).
-`CLAUDE.md` holds the architecture notes and the feature checklist.
+
+## Disclaimer
+
+This project was steered and tested by me and implemented with a coding agent.
 
 ## Known limitations
 
