@@ -37,9 +37,9 @@ internal sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private int _formatIndex;
 
     [ObservableProperty] private bool _launchAtStartup;
-    [ObservableProperty] private bool _autoCopyOnClose;
     [ObservableProperty] private bool _confirmRemoveAll;
     [ObservableProperty] private bool _closeEditorWhenEmpty;
+    [ObservableProperty] private bool _duckEditorForCapture;
     [ObservableProperty] private bool _captureCursor;
 
     public IReadOnlyList<HotkeyRow> Hotkeys { get; } = HotkeyActions.All.Select(a => new HotkeyRow(a)).ToList();
@@ -66,9 +66,9 @@ internal sealed partial class SettingsViewModel : ObservableObject
         FilenamePattern = s.FilenamePattern;
         FormatIndex = s.ImageFormat.Equals("jpg", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
         LaunchAtStartup = s.LaunchAtStartup;
-        AutoCopyOnClose = s.AutoCopyOnClose;
         ConfirmRemoveAll = s.ConfirmRemoveAll;
         CloseEditorWhenEmpty = s.CloseEditorWhenEmpty;
+        DuckEditorForCapture = s.DuckEditorForCapture;
         CaptureCursor = s.CaptureCursor;
         _loading = false;
     }
@@ -175,9 +175,9 @@ internal sealed partial class SettingsViewModel : ObservableObject
     partial void OnFilenamePatternChanged(string value) => Changed();
     partial void OnFormatIndexChanged(int value) => Changed();
     partial void OnLaunchAtStartupChanged(bool value) => Changed();
-    partial void OnAutoCopyOnCloseChanged(bool value) => Changed();
     partial void OnConfirmRemoveAllChanged(bool value) => Changed();
     partial void OnCloseEditorWhenEmptyChanged(bool value) => Changed();
+    partial void OnDuckEditorForCaptureChanged(bool value) => Changed();
     partial void OnCaptureCursorChanged(bool value) => Changed();
 
     private void Changed()
@@ -196,9 +196,9 @@ internal sealed partial class SettingsViewModel : ObservableObject
         if (!string.IsNullOrWhiteSpace(SaveFolder)) s.SaveFolder = SaveFolder.Trim();
         if (!string.IsNullOrWhiteSpace(FilenamePattern)) s.FilenamePattern = FilenamePattern.Trim();
         s.ImageFormat = FormatIndex == 1 ? "jpg" : "png";
-        s.AutoCopyOnClose = AutoCopyOnClose;
         s.ConfirmRemoveAll = ConfirmRemoveAll;
         s.CloseEditorWhenEmpty = CloseEditorWhenEmpty;
+        s.DuckEditorForCapture = DuckEditorForCapture;
         s.CaptureCursor = CaptureCursor;
 
         if (s.LaunchAtStartup != LaunchAtStartup)

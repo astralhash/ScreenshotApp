@@ -22,7 +22,6 @@ internal sealed class AppSettings
     public string FilenamePattern { get; set; } = "Screenshot_yyyy-MM-dd_HH-mm-ss";
     public string ImageFormat { get; set; } = "png"; // png | jpg
     public bool LaunchAtStartup { get; set; }
-    public bool AutoCopyOnClose { get; set; }
 
     /// <summary>Draw the mouse cursor into captures.</summary>
     public bool CaptureCursor { get; set; }
@@ -30,6 +29,9 @@ internal sealed class AppSettings
     /// <summary>Ask before "Remove all clips" (the dialog has a "don't ask again" checkbox).</summary>
     public bool ConfirmRemoveAll { get; set; } = true;
     public bool CloseEditorWhenEmpty { get; set; }
+
+    /// <summary>Hide the editor while a new clip is captured (so it is not in the shot), then bring it back.</summary>
+    public bool DuckEditorForCapture { get; set; } = true;
 
     /// <summary>Whether the region-capture zoom lens (Z) was on; remembered from capture to capture.</summary>
     public bool ZoomLensEnabled { get; set; }

@@ -263,7 +263,6 @@ internal sealed partial class EditorViewModel : ObservableObject
     /// <summary>With no clips the editor shows its start page (open a file or capture) instead of the tools.</summary>
     public bool HasShots => Shots.Count > 0;
     public bool IsEmpty => Shots.Count == 0;
-    public bool AutoCopyOnClose => _settings.Current.AutoCopyOnClose;
 
     public EditorViewModel(SettingsService settings, ClipStore store, Func<Task<string?>> pickSavePath)
     {

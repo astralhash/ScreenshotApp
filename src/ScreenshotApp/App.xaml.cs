@@ -148,12 +148,36 @@ public partial class App : Application
         _settingsWindow.Activate();
     }
 
-    private void CaptureFullScreen() => TryCaptureFullScreen();
+    /// <summary>
+    /// Runs a capture started from a hotkey or the tray. With <c>DuckEditorForCapture</c> a visible editor is hidden
+    /// first (so it is not in the shot) and shown again afterwards, whether or not something was captured.
+    /// </summary>
+    private async Task<bool> RunDuckedAsync(Func<Task<bool>> capture)
+    {
+        var editor = _editor;
+        bool ducked = editor is not null && _settings.Current.DuckEditorForCapture && editor.IsShown
+                      && !CaptureOverlay.IsActive;
+        if (ducked)
+        {
+            editor!.HideForCapture();
+            await Task.Delay(150); // let the window leave the screen before it is frozen
+        }
+        try
+        {
+            return await capture();
+        }
+        finally
+        {
+            if (ducked) editor!.ShowEditor();
+        }
+    }
+
+    private async void CaptureFullScreen() => await RunDuckedAsync(() => Task.FromResult(TryCaptureFullScreen()));
 
     private bool TryCaptureFullScreen() => TryCapture(ScreenCapture.CaptureMonitorUnderCursor);
 
     /// <summary>Captures the same screen rectangle as the last region capture, without the overlay.</summary>
-    private void CaptureRegionRepeat()
+    private async void CaptureRegionRepeat()
     {
         if (CaptureOverlay.IsActive) return;
         if (_settings.Current.LastRegion is { } last)
@@ -162,7 +186,7 @@ public partial class App : Application
             // Only when it still lies on the screen (a monitor may have been unplugged since).
             if (area.Width > 0 && area.Height > 0 && Monitors.VirtualScreen.Contains(area))
             {
-                TryCapture(() => ScreenCapture.CaptureRect(area));
+                await RunDuckedAsync(() => Task.FromResult(TryCapture(() => ScreenCapture.CaptureRect(area))));
                 return;
             }
         }
@@ -184,9 +208,9 @@ public partial class App : Application
         }
     }
 
-    private async void CaptureRegion() => await RunOverlayAsync(OverlayMode.Region);
+    private async void CaptureRegion() => await RunDuckedAsync(() => RunOverlayAsync(OverlayMode.Region));
 
-    private async void CaptureWindow() => await RunOverlayAsync(OverlayMode.Window);
+    private async void CaptureWindow() => await RunDuckedAsync(() => RunOverlayAsync(OverlayMode.Window));
 
     /// <summary>Runs the selection overlay; true when something was captured (false when cancelled or it failed).</summary>
     private async Task<bool> RunOverlayAsync(OverlayMode mode)

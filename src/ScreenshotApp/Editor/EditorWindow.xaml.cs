@@ -48,7 +48,7 @@ public sealed partial class EditorWindow : Window
     private Vector2 _offset;
     private bool _fitMode = true;
 
-    private bool _spaceDown, _panning, _drawing, _ending, _sized;
+    private bool _spaceDown, _panning, _drawing, _sized;
     private RectangleF _viewRect;
     private bool _pressHandledByHost;
 
@@ -190,6 +190,8 @@ public sealed partial class EditorWindow : Window
     /// <summary>Hides the window so it does not appear in a capture that was started from its buttons.</summary>
     internal void HideForCapture() => AppWindow.Hide();
 
+    internal bool IsShown => AppWindow.IsVisible;
+
     /// <summary>The start-page buttons ask the app to run a capture (the app hides this window first).</summary>
     internal event Action<CaptureKind>? CaptureRequested;
 
@@ -295,26 +297,11 @@ public sealed partial class EditorWindow : Window
         AppWindow.Move(new PointInt32(area.X + (area.Width - w) / 2, area.Y + (area.Height - h) / 2));
     }
 
-    private async void OnClosing(AppWindow sender, AppWindowClosingEventArgs args)
+    private void OnClosing(AppWindow sender, AppWindowClosingEventArgs args)
     {
         args.Cancel = true; // never destroy the window: the app lives in the tray
-        await EndSessionAsync();
-    }
-
-    private async Task EndSessionAsync()
-    {
-        if (_ending) return;
-        _ending = true;
-        try
-        {
-            if (ViewModel.AutoCopyOnClose) await ViewModel.CopyAsync();
-        }
-        finally
-        {
-            // Hide only: the clips stay in the film strip until they are removed with their × button.
-            AppWindow.Hide();
-            _ending = false;
-        }
+        // Hide only: the clips stay in the film strip until they are removed with their × button.
+        AppWindow.Hide();
     }
 
     private async Task<string?> PickSavePathAsync()

@@ -123,16 +123,23 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Capture settings -->
+                <TextBlock Text="Capture settings" Style="{StaticResource SectionHeader}" />
+                <Border Style="{StaticResource Card}">
+                    <StackPanel Spacing="14">
+                        <ToggleSwitch Header="Hide the editor while taking a new capture" OnContent="On" OffContent="Off"
+                                      IsOn="{x:Bind ViewModel.DuckEditorForCapture, Mode=TwoWay}" />
+                        <ToggleSwitch Header="Include the mouse cursor in captures" OnContent="On" OffContent="Off"
+                                      IsOn="{x:Bind ViewModel.CaptureCursor, Mode=TwoWay}" />
+                    </StackPanel>
+                </Border>
+
                 <!-- General -->
                 <TextBlock Text="General" Style="{StaticResource SectionHeader}" />
                 <Border Style="{StaticResource Card}">
                     <StackPanel Spacing="14">
-                        <ToggleSwitch Header="Include the mouse cursor in captures" OnContent="On" OffContent="Off"
-                                      IsOn="{x:Bind ViewModel.CaptureCursor, Mode=TwoWay}" />
                         <ToggleSwitch Header="Launch at Windows startup" OnContent="On" OffContent="Off"
                                       IsOn="{x:Bind ViewModel.LaunchAtStartup, Mode=TwoWay}" />
-                        <ToggleSwitch Header="Copy the current clip to the clipboard when the editor is closed" OnContent="On" OffContent="Off"
-                                      IsOn="{x:Bind ViewModel.AutoCopyOnClose, Mode=TwoWay}" />
                         <ToggleSwitch Header="Ask before removing all clips" OnContent="On" OffContent="Off"
                                       IsOn="{x:Bind ViewModel.ConfirmRemoveAll, Mode=TwoWay}" />
                         <ToggleSwitch Header="Close the editor when the last clip is closed" OnContent="On" OffContent="Off"
