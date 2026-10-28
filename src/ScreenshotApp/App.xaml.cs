@@ -3,6 +3,7 @@ using ScreenshotApp.Capture;
 using ScreenshotApp.Editor;
 using ScreenshotApp.Preferences;
 using ScreenshotApp.Services;
+using ScreenshotApp.Sharing;
 
 namespace ScreenshotApp;
 
@@ -16,6 +17,7 @@ public partial class App : Application
     private ClipStore? _clips;
     private EditorWindow? _editor;
     private SettingsWindow? _settingsWindow;
+    private RegionShare? _share;
 
     internal static SettingsService Settings => ((App)Current)._settings;
 
@@ -68,6 +70,12 @@ public partial class App : Application
         var switches = Environment.GetCommandLineArgs();
         if (switches.Contains("--open-editor", StringComparer.OrdinalIgnoreCase)) OpenEditor();
         if (switches.Contains("--open-settings", StringComparer.OrdinalIgnoreCase)) OpenSettings();
+#if DEBUG
+        // Developer shortcut: --share-region=X,Y,W,H starts sharing that rectangle without the overlay.
+        if (switches.FirstOrDefault(s => s.StartsWith("--share-region=", StringComparison.OrdinalIgnoreCase)) is { } share
+            && share["--share-region=".Length..].Split(',') is [var x, var y, var w, var h])
+            StartShare(new System.Drawing.Rectangle(int.Parse(x), int.Parse(y), int.Parse(w), int.Parse(h)));
+#endif
     }
 
     /// <summary>(Re)registers every configured hotkey; returns the ones another app already owns, e.g. "Region: Print Screen".</summary>
@@ -120,6 +128,8 @@ public partial class App : Application
             case TrayCommand.CaptureWindow: CaptureWindow(); break;
             case TrayCommand.CaptureFullScreen: CaptureFullScreen(); break;
             case TrayCommand.Settings: OpenSettings(); break;
+            case TrayCommand.ShareRegion: ShareRegion(); break;
+            case TrayCommand.StopSharing: StopSharing(); break;
             case TrayCommand.Exit: Shutdown(); break;
         }
     }
@@ -307,8 +317,81 @@ public partial class App : Application
         }
     }
 
+    /// <summary>
+    /// Starts sharing a region: picks it with the region overlay, then mirrors it live in a window that Teams
+    /// (or any app that shares windows) can share.
+    /// </summary>
+    private async void ShareRegion()
+    {
+        if (_share is not null || !RegionFrameSource.IsSupported)
+        {
+            if (_share is null) _tray?.ShowBalloon("Sharing unavailable", "Region sharing needs Windows 10 2004 or later.");
+            return;
+        }
+        if (await PickShareRegionAsync() is { } region) StartShare(region);
+    }
+
+    private void StartShare(System.Drawing.Rectangle region)
+    {
+        try
+        {
+            var share = new RegionShare(region);
+            share.Ended += StopSharing;
+            share.ChangeRegionRequested += ChangeSharedRegion;
+            _share = share;
+            _tray!.Sharing = true;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex);
+            _tray?.ShowBalloon("Sharing failed", ex.Message);
+        }
+    }
+
+    private async void ChangeSharedRegion()
+    {
+        if (_share is null) return;
+        _share.ShowOutline(false); // not in the frozen screen the overlay shows
+        var region = await PickShareRegionAsync();
+        if (_share is null) return; // stopped meanwhile
+        try
+        {
+            if (region is { } r) _share.ChangeRegion(r);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex);
+            _tray?.ShowBalloon("Sharing failed", ex.Message);
+        }
+        _share?.ShowOutline(true);
+    }
+
+    /// <summary>The selection overlay, used only for its rectangle; null when cancelled.</summary>
+    private async Task<System.Drawing.Rectangle?> PickShareRegionAsync()
+    {
+        if (CaptureOverlay.IsActive) return null;
+        try
+        {
+            var image = await new CaptureOverlay(OverlayMode.Region).RunAsync();
+            return image is null ? null : new System.Drawing.Rectangle(image.ScreenX, image.ScreenY, image.Width, image.Height);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex);
+            return null;
+        }
+    }
+
+    private void StopSharing()
+    {
+        _share?.Dispose();
+        _share = null;
+        if (_tray is not null) _tray.Sharing = false;
+    }
+
     private void Shutdown()
     {
+        StopSharing();
         _clips?.Flush(); // persist unsaved clips and their edits
         _hotkeys?.Dispose();
         _tray?.Dispose();

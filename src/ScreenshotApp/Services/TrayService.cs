@@ -14,6 +14,8 @@ internal enum TrayCommand
     CaptureFullScreen,
     Settings,
     Exit,
+    ShareRegion,
+    StopSharing,
 }
 
 /// <summary>Notification-area icon with a context menu and balloon notifications.</summary>
@@ -26,6 +28,9 @@ internal sealed unsafe class TrayService : IDisposable
     private readonly Action<TrayCommand> _onCommand;
     private HICON _icon;
     private bool _added;
+
+    /// <summary>A region is being shared: the menu offers to stop it instead of starting one.</summary>
+    public bool Sharing { get; set; }
 
     public TrayService(MessageWindow window, Action<TrayCommand> onCommand)
     {
@@ -81,6 +86,9 @@ internal sealed unsafe class TrayService : IDisposable
             Append(menu, TrayCommand.CaptureRegion, "Capture Region");
             Append(menu, TrayCommand.CaptureWindow, "Capture Window");
             Append(menu, TrayCommand.CaptureFullScreen, "Capture Full Screen");
+            PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (string?)null);
+            if (Sharing) Append(menu, TrayCommand.StopSharing, "Stop Sharing Region");
+            else Append(menu, TrayCommand.ShareRegion, "Share Region…");
             PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (string?)null);
             Append(menu, TrayCommand.Settings, "Settings");
             PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (string?)null);

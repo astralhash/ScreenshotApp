@@ -103,3 +103,6 @@ CURSORINFO
 GetIconInfo
 DrawIconEx
 GetWindowRect
+SetLayeredWindowAttributes
+MonitorFromWindow
+GetClientRect

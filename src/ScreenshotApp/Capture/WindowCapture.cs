@@ -1,5 +1,4 @@
 using System.Drawing;
-using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Microsoft.Graphics.Canvas;
 using ScreenshotApp.Services;
@@ -16,9 +15,6 @@ namespace ScreenshotApp.Capture;
 /// </summary>
 internal static class WindowCapture
 {
-    private static readonly Guid IID_IGraphicsCaptureItemInterop = new("3628e81b-3cac-4c60-b7f4-23ce0e0c3356");
-    private static readonly Guid IID_IGraphicsCaptureItem = new("79c3f95b-31f7-4ec2-a464-632ef5d30760");
-    private static readonly Guid IID_IGraphicsCaptureSession3 = new("f2cdd966-22ae-5ea1-9596-3a289344c3be");
     private static readonly TimeSpan FrameTimeout = TimeSpan.FromSeconds(1);
 
     /// <summary>
@@ -45,7 +41,7 @@ internal static class WindowCapture
     private static async Task<(byte[] Pixels, int Width, int Height)?> GrabAsync(HWND hwnd)
     {
         if (!GraphicsCaptureSession.IsSupported()) return null;
-        var item = CreateItem(hwnd);
+        var item = CaptureInterop.CreateForWindow(hwnd);
         var device = CanvasDevice.GetSharedDevice();
         var tcs = new TaskCompletionSource<(byte[], int, int)?>(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -67,53 +63,11 @@ internal static class WindowCapture
 
         using var session = pool.CreateCaptureSession(item);
         session.IsCursorCaptureEnabled = false;
-        TryDisableBorder(session);
+        CaptureInterop.TryDisableBorder(session);
         session.StartCapture();
 
         var done = await Task.WhenAny(tcs.Task, Task.Delay(FrameTimeout));
         return done == tcs.Task ? await tcs.Task : null;
-    }
-
-    /// <summary>GraphicsCaptureItem.CreateForWindow is only reachable through IGraphicsCaptureItemInterop.</summary>
-    private static unsafe GraphicsCaptureItem CreateItem(HWND hwnd)
-    {
-        var factory = WinRT.ActivationFactory.Get("Windows.Graphics.Capture.GraphicsCaptureItem");
-        Marshal.ThrowExceptionForHR(Marshal.QueryInterface(factory.ThisPtr, in IID_IGraphicsCaptureItemInterop, out var interop));
-        try
-        {
-            // IUnknown (3 slots), then CreateForWindow, CreateForMonitor.
-            var createForWindow = (delegate* unmanaged[Stdcall]<IntPtr, HWND, Guid*, IntPtr*, int>)(*(void***)interop)[3];
-            var iid = IID_IGraphicsCaptureItem;
-            IntPtr itemPtr;
-            Marshal.ThrowExceptionForHR(createForWindow(interop, hwnd, &iid, &itemPtr));
-            try { return GraphicsCaptureItem.FromAbi(itemPtr); }
-            finally { Marshal.Release(itemPtr); }
-        }
-        finally
-        {
-            Marshal.Release(interop);
-        }
-    }
-
-    /// <summary>
-    /// Hides the yellow "being captured" border (Windows 11; IsBorderRequired is not in this SDK projection).
-    /// Best effort: older systems lack the interface and the call may be refused.
-    /// </summary>
-    private static unsafe void TryDisableBorder(GraphicsCaptureSession session)
-    {
-        var ptr = ((WinRT.IWinRTObject)session).NativeObject.ThisPtr;
-        if (Marshal.QueryInterface(ptr, in IID_IGraphicsCaptureSession3, out var session3) < 0) return;
-        try
-        {
-            // IInspectable (6 slots), then get_IsBorderRequired, put_IsBorderRequired.
-            var putIsBorderRequired = (delegate* unmanaged[Stdcall]<IntPtr, byte, int>)(*(void***)session3)[7];
-            int hr = putIsBorderRequired(session3, 0);
-            if (hr < 0) Log.Info($"Capture border could not be disabled (0x{hr:X8}).");
-        }
-        finally
-        {
-            Marshal.Release(session3);
-        }
     }
 
     /// <summary>
