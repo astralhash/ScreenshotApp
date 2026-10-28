@@ -132,7 +132,7 @@
                     <PathIcon Data="M2.2,12.8 L10,5 L11,6 L3.2,13.8 Z M8,2.5 L13.5,2.5 L13.5,8 Z" />
                 </ToggleButton>
                 <ToggleButton Tag="Rectangle" Style="{StaticResource ToolToggle}" Click="Tool_Click" ToolTipService.ToolTip="Rectangle (R)">
-                    <PathIcon Data="F0 M2,3 L14,3 L14,13 L2,13 Z M3.5,4.5 L3.5,11.5 L12.5,11.5 L12.5,4.5 Z" />
+                    <PathIcon Width="16" Height="16" HorizontalAlignment="Center" Data="F0 M2,3 L14,3 L14,13 L2,13 Z M3.5,4.5 L3.5,11.5 L12.5,11.5 L12.5,4.5 Z" />
                 </ToggleButton>
                 <ToggleButton Tag="Line" Style="{StaticResource ToolToggle}" Click="Tool_Click" ToolTipService.ToolTip="Line (L)">
                     <PathIcon Data="M2.2,12.8 L12.8,2.2 L13.8,3.2 L3.2,13.8 Z" />
@@ -153,7 +153,7 @@
                     </Border>
                 </ToggleButton>
                 <ToggleButton Tag="Blur" Style="{StaticResource ToolToggle}" Click="Tool_Click" ToolTipService.ToolTip="Blur / pixelate (B)">
-                    <PathIcon Data="M2,2 L6,2 L6,6 L2,6 Z M10,2 L14,2 L14,6 L10,6 Z M6,6 L10,6 L10,10 L6,10 Z M2,10 L6,10 L6,14 L2,14 Z M10,10 L14,10 L14,14 L10,14 Z" />
+                    <PathIcon Width="16" Height="16" HorizontalAlignment="Center" Data="M2,2 L6,2 L6,6 L2,6 Z M10,2 L14,2 L14,6 L10,6 Z M6,6 L10,6 L10,10 L6,10 Z M2,10 L6,10 L6,14 L2,14 Z M10,10 L14,10 L14,14 L10,14 Z" />
                 </ToggleButton>
                 <ToggleButton Tag="Crop" Style="{StaticResource ToolToggle}" Click="Tool_Click" ToolTipService.ToolTip="Crop (C)">
                     <FontIcon Glyph="&#xE7A8;" Style="{StaticResource ToolIcon}" />
@@ -331,33 +331,27 @@
                 </Button>
 
                 <Button Grid.Row="1" Grid.Column="2" Tag="Region" Click="CaptureButton_Click"
-                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Height="84"
-                        AllowFocusOnInteraction="False" ToolTipService.ToolTip="Ctrl+Shift+3 or Print Screen">
-                    <StackPanel Spacing="6" HorizontalAlignment="Center">
-                        <PathIcon Data="M2,2 L6,2 L6,3.2 L3.2,3.2 L3.2,6 L2,6 Z M10,2 L14,2 L14,6 L12.8,6 L12.8,3.2 L10,3.2 Z M2,10 L3.2,10 L3.2,12.8 L6,12.8 L6,14 L2,14 Z M14,10 L14,14 L10,14 L10,12.8 L12.8,12.8 L12.8,10 Z" />
+                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Height="68"
+                        AllowFocusOnInteraction="False">
+                    <StackPanel Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <PathIcon Width="16" Height="16" HorizontalAlignment="Center" Data="M2,2 L6,2 L6,3.2 L3.2,3.2 L3.2,6 L2,6 Z M10,2 L14,2 L14,6 L12.8,6 L12.8,3.2 L10,3.2 Z M2,10 L3.2,10 L3.2,12.8 L6,12.8 L6,14 L2,14 Z M14,10 L14,14 L10,14 L10,12.8 L12.8,12.8 L12.8,10 Z" />
                         <TextBlock Text="Region" HorizontalAlignment="Center" />
-                        <TextBlock Text="Ctrl+Shift+3" HorizontalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}"
-                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
                 </Button>
                 <Button Grid.Row="1" Grid.Column="1" Tag="Window" Click="CaptureButton_Click"
-                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Height="84"
-                        AllowFocusOnInteraction="False" ToolTipService.ToolTip="Ctrl+Shift+2">
-                    <StackPanel Spacing="6" HorizontalAlignment="Center">
-                        <PathIcon Data="F0 M2,3 L14,3 L14,13 L2,13 Z M3.2,6 L3.2,11.8 L12.8,11.8 L12.8,6 Z" />
+                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Height="68"
+                        AllowFocusOnInteraction="False">
+                    <StackPanel Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <PathIcon Width="16" Height="16" HorizontalAlignment="Center" Data="F0 M2,3 L14,3 L14,13 L2,13 Z M3.2,6 L3.2,11.8 L12.8,11.8 L12.8,6 Z" />
                         <TextBlock Text="Window" HorizontalAlignment="Center" />
-                        <TextBlock Text="Ctrl+Shift+2" HorizontalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}"
-                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
                 </Button>
                 <Button Grid.Row="1" Grid.Column="0" Tag="FullScreen" Click="CaptureButton_Click"
-                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Height="84"
-                        AllowFocusOnInteraction="False" ToolTipService.ToolTip="Ctrl+Shift+1">
-                    <StackPanel Spacing="6" HorizontalAlignment="Center">
-                        <FontIcon Glyph="&#xE740;" FontFamily="Segoe Fluent Icons" FontSize="16" />
+                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Height="68"
+                        AllowFocusOnInteraction="False">
+                    <StackPanel Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <FontIcon Glyph="&#xE740;" FontFamily="Segoe Fluent Icons" FontSize="16" HorizontalAlignment="Center" />
                         <TextBlock Text="Full screen" HorizontalAlignment="Center" />
-                        <TextBlock Text="Ctrl+Shift+1" HorizontalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}"
-                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
                 </Button>
             </Grid>

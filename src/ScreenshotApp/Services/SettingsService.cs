@@ -13,6 +13,8 @@ internal enum CaptureTargets
     File = 4,
 }
 
+internal sealed record RegionRect(int X, int Y, int Width, int Height);
+
 internal sealed class AppSettings
 {
     public string SaveFolder { get; set; } =
@@ -27,6 +29,20 @@ internal sealed class AppSettings
 
     /// <summary>Whether the region-capture zoom lens (Z) was on; remembered from capture to capture.</summary>
     public bool ZoomLensEnabled { get; set; }
+
+    /// <summary>
+    /// Hotkeys the user changed, per action name, as text ("Alt+Print Screen"); "" for none.
+    /// Actions that are missing use <see cref="HotkeyActions.DefaultHotkey"/>.
+    /// </summary>
+    public Dictionary<string, string> Hotkeys { get; set; } = new();
+
+    /// <summary>The last region that was captured with the selection overlay (physical screen pixels), for "repeat the last region".</summary>
+    public RegionRect? LastRegion { get; set; }
+
+    public string GetHotkey(HotkeyAction action) =>
+        Hotkeys.TryGetValue(action.ToString(), out var key) ? key : HotkeyActions.DefaultHotkey(action);
+
+    public void SetHotkey(HotkeyAction action, string value) => Hotkeys[action.ToString()] = value;
 
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public CaptureTargets CaptureTargets { get; set; } = CaptureTargets.Editor | CaptureTargets.Clipboard;

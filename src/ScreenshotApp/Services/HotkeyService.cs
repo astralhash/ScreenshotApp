@@ -18,13 +18,20 @@ internal sealed class HotkeyService : IDisposable
     }
 
     /// <summary>Registers a global hotkey. Returns false if another app already owns it.</summary>
-    public bool Register(HOT_KEY_MODIFIERS modifiers, VIRTUAL_KEY key, Action action)
+    public bool Register(Hotkey hotkey, Action action)
     {
         int id = _nextId++;
-        if (!PInvoke.RegisterHotKey(_window.Handle, id, modifiers | HOT_KEY_MODIFIERS.MOD_NOREPEAT, (uint)key))
+        if (!PInvoke.RegisterHotKey(_window.Handle, id, hotkey.Modifiers | HOT_KEY_MODIFIERS.MOD_NOREPEAT, hotkey.Key))
             return false;
         _actions[id] = action;
         return true;
+    }
+
+    public void UnregisterAll()
+    {
+        foreach (var id in _actions.Keys)
+            PInvoke.UnregisterHotKey(_window.Handle, id);
+        _actions.Clear();
     }
 
     private void OnMessage(uint msg, WPARAM wParam, LPARAM lParam, ref bool handled)
@@ -39,8 +46,6 @@ internal sealed class HotkeyService : IDisposable
     public void Dispose()
     {
         _window.MessageReceived -= OnMessage;
-        foreach (var id in _actions.Keys)
-            PInvoke.UnregisterHotKey(_window.Handle, id);
-        _actions.Clear();
+        UnregisterAll();
     }
 }

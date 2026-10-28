@@ -1,7 +1,26 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using Microsoft.UI.Xaml;
 using ScreenshotApp.Services;
+using Windows.Win32.UI.Input.KeyboardAndMouse;
 
 namespace ScreenshotApp.Preferences;
+
+/// <summary>One line of the hotkey list: what it triggers and the key currently assigned (or being recorded).</summary>
+internal sealed partial class HotkeyRow : ObservableObject
+{
+    public HotkeyRow(HotkeyAction action) => Action = action;
+
+    public HotkeyAction Action { get; }
+    public string Label => HotkeyActions.Label(Action);
+
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(Text))] private string _assigned = "";
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(Text))] private bool _recording;
+
+    public string Text => Recording ? "Press the keys…" : Assigned.Length == 0 ? "Not set" : Assigned;
+    public bool CanClear => Assigned.Length > 0;
+
+    partial void OnAssignedChanged(string value) => OnPropertyChanged(nameof(CanClear));
+}
 
 /// <summary>Edits <see cref="AppSettings"/>; every change is written back and saved to %AppData% immediately.</summary>
 internal sealed partial class SettingsViewModel : ObservableObject
@@ -21,10 +40,23 @@ internal sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _autoCopyOnClose;
     [ObservableProperty] private bool _confirmRemoveAll;
 
+    public IReadOnlyList<HotkeyRow> Hotkeys { get; } = HotkeyActions.All.Select(a => new HotkeyRow(a)).ToList();
+
+    [ObservableProperty] private string _hotkeyMessage = "";
+
+    private HotkeyRow? _recordingRow;
+
+    public bool IsRecording => _recordingRow is not null;
+
+    public Visibility HasHotkeyMessage => HotkeyMessage.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+    partial void OnHotkeyMessageChanged(string value) => OnPropertyChanged(nameof(HasHotkeyMessage));
+
     public SettingsViewModel(SettingsService service)
     {
         _service = service;
         var s = service.Current;
+        LoadHotkeys();
         TargetEditor = s.CaptureTargets.HasFlag(CaptureTargets.Editor);
         TargetClipboard = s.CaptureTargets.HasFlag(CaptureTargets.Clipboard);
         TargetFile = s.CaptureTargets.HasFlag(CaptureTargets.File);
@@ -35,6 +67,88 @@ internal sealed partial class SettingsViewModel : ObservableObject
         AutoCopyOnClose = s.AutoCopyOnClose;
         ConfirmRemoveAll = s.ConfirmRemoveAll;
         _loading = false;
+    }
+
+    private void LoadHotkeys()
+    {
+        foreach (var row in Hotkeys)
+            row.Assigned = Hotkey.Parse(_service.Current.GetHotkey(row.Action))?.ToString() ?? "";
+    }
+
+    /// <summary>Starts listening for a key combination. Global hotkeys are released meanwhile, or they would swallow the keys.</summary>
+    public void BeginRecording(HotkeyRow row)
+    {
+        EndRecording(apply: false);
+        _recordingRow = row;
+        row.Recording = true;
+        HotkeyMessage = "Press the new key combination. Esc cancels.";
+        App.SuspendHotkeys();
+    }
+
+    /// <summary>Stops listening and registers the hotkeys again.</summary>
+    public void EndRecording(bool apply = true)
+    {
+        if (_recordingRow is null) return;
+        _recordingRow.Recording = false;
+        _recordingRow = null;
+        if (apply) ApplyHotkeys();
+    }
+
+    /// <summary>Handles a key pressed while recording; returns false (and explains why) when it cannot be used.</summary>
+    public bool TryAssignRecorded(HOT_KEY_MODIFIERS modifiers, uint key)
+    {
+        if (_recordingRow is not { } row) return false;
+        if (Hotkey.Create(modifiers, key) is not { } hotkey)
+        {
+            HotkeyMessage = "That key needs Ctrl, Alt, Shift or Win with it (or use Print Screen, Pause or an F key).";
+            return false;
+        }
+        EndRecording(apply: false);
+        Assign(row, hotkey.ToString());
+        return true;
+    }
+
+    public void Clear(HotkeyRow row)
+    {
+        EndRecording(apply: false);
+        Assign(row, "");
+    }
+
+    public void ResetHotkeys()
+    {
+        EndRecording(apply: false);
+        _service.Current.Hotkeys.Clear();
+        LoadHotkeys();
+        SaveAndApplyHotkeys();
+    }
+
+    private void Assign(HotkeyRow row, string value)
+    {
+        // One key can only trigger one thing: take it away from whatever had it.
+        if (value.Length > 0)
+            foreach (var other in Hotkeys.Where(o => o != row && o.Assigned == value))
+            {
+                _service.Current.SetHotkey(other.Action, "");
+                other.Assigned = "";
+            }
+        _service.Current.SetHotkey(row.Action, value);
+        row.Assigned = value;
+        SaveAndApplyHotkeys();
+    }
+
+    private void SaveAndApplyHotkeys()
+    {
+        try { _service.Save(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Log.Error(ex); }
+        ApplyHotkeys();
+    }
+
+    private void ApplyHotkeys()
+    {
+        var failed = App.ApplyHotkeys();
+        HotkeyMessage = failed.Count == 0
+            ? ""
+            : "Already used by another app, so it will not work: " + string.Join("; ", failed);
     }
 
     /// <summary>A capture would go nowhere.</summary>

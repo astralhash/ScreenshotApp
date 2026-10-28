@@ -3,7 +3,6 @@ using ScreenshotApp.Capture;
 using ScreenshotApp.Editor;
 using ScreenshotApp.Preferences;
 using ScreenshotApp.Services;
-using Windows.Win32.UI.Input.KeyboardAndMouse;
 
 namespace ScreenshotApp;
 
@@ -58,13 +57,7 @@ public partial class App : Application
         GetEditor();
         if (_settings.Current.LaunchAtStartup) StartupService.Apply(true); // keep the Run entry pointing at this exe
 
-        var ctrlShift = HOT_KEY_MODIFIERS.MOD_CONTROL | HOT_KEY_MODIFIERS.MOD_SHIFT;
-        var failed = new List<string>();
-        if (!_hotkeys.Register(ctrlShift, VIRTUAL_KEY.VK_1, CaptureFullScreen)) failed.Add("Ctrl+Shift+1");
-        if (!_hotkeys.Register(ctrlShift, VIRTUAL_KEY.VK_2, CaptureWindow)) failed.Add("Ctrl+Shift+2");
-        if (!_hotkeys.Register(ctrlShift, VIRTUAL_KEY.VK_3, CaptureRegion)) failed.Add("Ctrl+Shift+3");
-        if (!_hotkeys.Register(0, VIRTUAL_KEY.VK_SNAPSHOT, CaptureRegion)) failed.Add("Print Screen");
-
+        var failed = RegisterHotkeys();
         if (failed.Count > 0)
             _tray.ShowBalloon("Hotkeys unavailable", "Already in use by another app: " + string.Join(", ", failed));
 
@@ -75,6 +68,32 @@ public partial class App : Application
         var switches = Environment.GetCommandLineArgs();
         if (switches.Contains("--open-editor", StringComparer.OrdinalIgnoreCase)) OpenEditor();
         if (switches.Contains("--open-settings", StringComparer.OrdinalIgnoreCase)) OpenSettings();
+    }
+
+    /// <summary>(Re)registers every configured hotkey; returns the ones another app already owns, e.g. "Region: Print Screen".</summary>
+    internal static List<string> ApplyHotkeys() => ((App)Current).RegisterHotkeys();
+
+    /// <summary>Releases all hotkeys, so the Settings window can see the keys while one is being recorded.</summary>
+    internal static void SuspendHotkeys() => ((App)Current)._hotkeys?.UnregisterAll();
+
+    private List<string> RegisterHotkeys()
+    {
+        var failed = new List<string>();
+        if (_hotkeys is null) return failed;
+        _hotkeys.UnregisterAll();
+        foreach (var action in HotkeyActions.All)
+        {
+            Action run = action switch
+            {
+                HotkeyAction.FullScreen => CaptureFullScreen,
+                HotkeyAction.Window => CaptureWindow,
+                HotkeyAction.Region => CaptureRegion,
+                _ => CaptureRegionRepeat,
+            };
+            if (Hotkey.Parse(_settings.Current.GetHotkey(action)) is not { } hotkey) continue;
+            if (!_hotkeys.Register(hotkey, run)) failed.Add($"{HotkeyActions.Label(action)}: {hotkey}");
+        }
+        return failed;
     }
 
     /// <summary>Brings back unsaved clips from the previous run, silently; they are waiting in the editor when it is opened.</summary>
@@ -131,11 +150,30 @@ public partial class App : Application
 
     private void CaptureFullScreen() => TryCaptureFullScreen();
 
-    private bool TryCaptureFullScreen()
+    private bool TryCaptureFullScreen() => TryCapture(ScreenCapture.CaptureMonitorUnderCursor);
+
+    /// <summary>Captures the same screen rectangle as the last region capture, without the overlay.</summary>
+    private void CaptureRegionRepeat()
+    {
+        if (CaptureOverlay.IsActive) return;
+        if (_settings.Current.LastRegion is { } last)
+        {
+            var area = new System.Drawing.Rectangle(last.X, last.Y, last.Width, last.Height);
+            // Only when it still lies on the screen (a monitor may have been unplugged since).
+            if (area.Width > 0 && area.Height > 0 && Monitors.VirtualScreen.Contains(area))
+            {
+                TryCapture(() => ScreenCapture.CaptureRect(area));
+                return;
+            }
+        }
+        CaptureRegion(); // nothing to repeat yet: pick a region now
+    }
+
+    private bool TryCapture(Func<CapturedImage> grab)
     {
         try
         {
-            HandleCapture(ScreenCapture.CaptureMonitorUnderCursor());
+            HandleCapture(grab());
             return true;
         }
         catch (Exception ex)
@@ -158,6 +196,7 @@ public partial class App : Application
         {
             var image = await new CaptureOverlay(mode).RunAsync();
             if (image is null) return false;
+            if (mode == OverlayMode.Region) RememberRegion(image);
             HandleCapture(image);
             return true;
         }
@@ -167,6 +206,13 @@ public partial class App : Application
             _tray?.ShowBalloon("Capture failed", ex.Message);
             return false;
         }
+    }
+
+    private void RememberRegion(CapturedImage image)
+    {
+        _settings.Current.LastRegion = new RegionRect(image.ScreenX, image.ScreenY, image.Width, image.Height);
+        try { _settings.Save(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Log.Error(ex); }
     }
 
     /// <summary>A capture started from the editor's start page: hide the editor so it is not in the shot.</summary>

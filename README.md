@@ -27,15 +27,19 @@ Built with C#, .NET 8 and WinUI 3 (Windows App SDK). It is unpackaged, so there 
 
 ## Hotkeys
 
-| Keys | Action |
+| Default | Action |
 | --- | --- |
-| `Ctrl+Shift+1` | Full screen (monitor under the cursor) |
-| `Ctrl+Shift+2` | Window |
-| `Ctrl+Shift+3` or `Print Screen` | Region |
+| `Ctrl+Shift+Print Screen` | Full screen (monitor under the cursor) |
+| `Alt+Print Screen` | Window |
+| `Print Screen` | Region |
+| `Shift+Print Screen` | Region again: the same rectangle as the last region capture, no selection step |
+
+All of them can be changed or cleared in Settings: click a key box, press the new combination, `Esc` cancels. A key that
+is already used by another app is reported there. Without Ctrl, Alt, Shift or Win only Print Screen, Pause, Scroll Lock
+and the F keys are accepted.
 
 If **Print Screen** does nothing, Windows may still hand it to the Snipping Tool: turn off
 *Settings → Accessibility → Keyboard → Use the Print screen button to open screen capture*.
-Hotkeys are shown in Settings but cannot be changed yet.
 
 ## Editor shortcuts
 
@@ -114,7 +118,7 @@ This project was steered and tested by me and implemented with a coding agent.
 - Capture uses a GDI snapshot, so content protected by the system (some video players) can come out black.
 - Window capture picks top-level windows only.
 - Blur and Pixelate act on the captured image, not on other annotations drawn under them.
-- Hotkeys are fixed. ARM64 is configured in the project but has not been built.
+- ARM64 is configured in the project but has not been built.
 - Out of scope for now: recording, OCR, scroll capture, uploads, history, pin-to-screen.
 
 ## License
