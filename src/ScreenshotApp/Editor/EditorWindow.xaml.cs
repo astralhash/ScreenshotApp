@@ -66,6 +66,10 @@ public sealed partial class EditorWindow : Window
         {
             if (e.PropertyName == nameof(EditorViewModel.SelectedShot)) SwitchDocument(ViewModel.SelectedShot);
         };
+        ViewModel.LastShotClosed += (_, _) =>
+        {
+            if (settings.Current.CloseEditorWhenEmpty) AppWindow.Hide();
+        };
         InitializeComponent();
 
         _hwnd = WindowNative.GetWindowHandle(this);

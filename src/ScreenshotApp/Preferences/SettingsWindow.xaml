@@ -135,6 +135,8 @@
                                       IsOn="{x:Bind ViewModel.AutoCopyOnClose, Mode=TwoWay}" />
                         <ToggleSwitch Header="Ask before removing all clips" OnContent="On" OffContent="Off"
                                       IsOn="{x:Bind ViewModel.ConfirmRemoveAll, Mode=TwoWay}" />
+                        <ToggleSwitch Header="Close the editor when the last clip is closed" OnContent="On" OffContent="Off"
+                                      IsOn="{x:Bind ViewModel.CloseEditorWhenEmpty, Mode=TwoWay}" />
                     </StackPanel>
                 </Border>
             </StackPanel>

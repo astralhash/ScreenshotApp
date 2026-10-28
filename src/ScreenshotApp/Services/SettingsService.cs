@@ -29,6 +29,7 @@ internal sealed class AppSettings
 
     /// <summary>Ask before "Remove all clips" (the dialog has a "don't ask again" checkbox).</summary>
     public bool ConfirmRemoveAll { get; set; } = true;
+    public bool CloseEditorWhenEmpty { get; set; }
 
     /// <summary>Whether the region-capture zoom lens (Z) was on; remembered from capture to capture.</summary>
     public bool ZoomLensEnabled { get; set; }

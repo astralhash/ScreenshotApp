@@ -330,6 +330,7 @@ internal sealed partial class EditorViewModel : ObservableObject
         if (Shots.Count == 0)
         {
             SelectedShot = null; // the editor stays open and shows its start page
+            LastShotClosed?.Invoke(this, EventArgs.Empty);
         }
         else if (wasSelected || SelectedShot is null)
         {
@@ -435,7 +436,12 @@ internal sealed partial class EditorViewModel : ObservableObject
         foreach (var doc in Shots.ToList()) _store.Remove(doc);
         Shots.Clear();
         SelectedShot = null; // the editor stays open and shows its start page
+        LastShotClosed?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>Raised after the film strip becomes empty because clips were closed.</summary>
+    public event EventHandler? LastShotClosed;
+
     /// <summary>A saved, unedited clip no longer needs to survive an app restart.</summary>
     private void MarkSaved(EditorDocument shot)
     {
