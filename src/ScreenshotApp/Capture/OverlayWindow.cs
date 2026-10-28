@@ -160,10 +160,10 @@ internal sealed unsafe class OverlayWindow : IDisposable
                 if (wParam.Value == (nuint)VIRTUAL_KEY.VK_ESCAPE) _owner.Cancel();
                 else if (wParam.Value == (nuint)VIRTUAL_KEY.VK_RETURN) _owner.Confirm();
                 else if (wParam.Value == (nuint)VIRTUAL_KEY.VK_Z) _owner.ToggleLens();
-                else if (wParam.Value == (nuint)VIRTUAL_KEY.VK_LEFT) _owner.Nudge(-1, 0);
-                else if (wParam.Value == (nuint)VIRTUAL_KEY.VK_RIGHT) _owner.Nudge(1, 0);
-                else if (wParam.Value == (nuint)VIRTUAL_KEY.VK_UP) _owner.Nudge(0, -1);
-                else if (wParam.Value == (nuint)VIRTUAL_KEY.VK_DOWN) _owner.Nudge(0, 1);
+                else if (wParam.Value == (nuint)VIRTUAL_KEY.VK_LEFT || wParam.Value == (nuint)VIRTUAL_KEY.VK_A) _owner.Nudge(-1, 0);
+                else if (wParam.Value == (nuint)VIRTUAL_KEY.VK_RIGHT || wParam.Value == (nuint)VIRTUAL_KEY.VK_D) _owner.Nudge(1, 0);
+                else if (wParam.Value == (nuint)VIRTUAL_KEY.VK_UP || wParam.Value == (nuint)VIRTUAL_KEY.VK_W) _owner.Nudge(0, -1);
+                else if (wParam.Value == (nuint)VIRTUAL_KEY.VK_DOWN || wParam.Value == (nuint)VIRTUAL_KEY.VK_S) _owner.Nudge(0, 1);
                 return (LRESULT)0;
             case PInvoke.WM_TIMER:
                 if ((PInvoke.GetAsyncKeyState((int)VIRTUAL_KEY.VK_ESCAPE) & 0x8000) != 0) _owner.Cancel();

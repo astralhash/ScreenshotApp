@@ -115,8 +115,13 @@
                         <Border Grid.Row="2" Grid.Column="1" Style="{StaticResource KeyCap}"><TextBlock Text="Ctrl + Shift + 3" /></Border>
                         <TextBlock Grid.Row="3" Text="Region (alternative)" VerticalAlignment="Center" />
                         <Border Grid.Row="3" Grid.Column="1" Style="{StaticResource KeyCap}"><TextBlock Text="Print Screen" /></Border>
-                        <TextBlock Grid.Row="4" Grid.ColumnSpan="2" Style="{StaticResource Hint}"
-                                   Text="Changing hotkeys is not available yet. During a region capture: Z toggles the zoom lens, arrow keys move the cursor one pixel, Esc cancels." />
+                        <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Spacing="4">
+                            <TextBlock FontWeight="SemiBold" TextWrapping="Wrap"
+                                       Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                       Text="Tip: press Z during a region capture to toggle a zoom lens for pixel-precise selection." />
+                            <TextBlock Style="{StaticResource Hint}"
+                                       Text="Arrow keys or W A S D move the cursor one pixel. Esc cancels." />
+                        </StackPanel>
                     </Grid>
                 </Border>
 

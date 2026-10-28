@@ -1,4 +1,5 @@
 using System.Drawing;
+using ScreenshotApp.Services;
 using Windows.Win32;
 using Windows.Win32.UI.Input.KeyboardAndMouse;
 
@@ -32,7 +33,11 @@ internal sealed class CaptureOverlay
     /// <summary>The Z-key magnifier (region capture only).</summary>
     public bool LensEnabled { get; private set; }
 
-    public CaptureOverlay(OverlayMode mode) => _mode = mode;
+    public CaptureOverlay(OverlayMode mode)
+    {
+        _mode = mode;
+        LensEnabled = mode == OverlayMode.Region && App.Settings.Current.ZoomLensEnabled;
+    }
 
     public Task<CapturedImage?> RunAsync()
     {
@@ -109,6 +114,9 @@ internal sealed class CaptureOverlay
     {
         if (_mode != OverlayMode.Region) return;
         LensEnabled = !LensEnabled;
+        App.Settings.Current.ZoomLensEnabled = LensEnabled;
+        try { App.Settings.Save(); }
+        catch (Exception ex) { Log.Error(ex); }
         InvalidateAll();
     }
 

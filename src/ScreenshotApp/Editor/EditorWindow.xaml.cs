@@ -468,8 +468,19 @@ public sealed partial class EditorWindow : Window
         ViewModel.RemoveAllShots();
     }
 
-    private void Thumb_PointerEntered(object sender, PointerRoutedEventArgs e) => SetRemoveVisible(sender, true);
-    private void Thumb_PointerExited(object sender, PointerRoutedEventArgs e) => SetRemoveVisible(sender, false);
+    private EditorDocument? _hoveredClip;
+
+    private void Thumb_PointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: EditorDocument doc }) _hoveredClip = doc;
+        SetRemoveVisible(sender, true);
+    }
+
+    private void Thumb_PointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: EditorDocument doc } && doc == _hoveredClip) _hoveredClip = null;
+        SetRemoveVisible(sender, false);
+    }
 
     private static void SetRemoveVisible(object thumb, bool visible)
     {
@@ -781,6 +792,13 @@ public sealed partial class EditorWindow : Window
     private void Root_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
         if (FocusManager.GetFocusedElement(Root.XamlRoot) is TextBox) return;
+        if (e.Key == VirtualKey.Delete && _hoveredClip is { } hovered)
+        {
+            _hoveredClip = null;
+            ViewModel.RemoveShot(hovered);
+            e.Handled = true;
+            return;
+        }
         if (HandleToolKey(e)) return;
         if (e.Key != VirtualKey.Space) return;
         if (!_spaceDown)
