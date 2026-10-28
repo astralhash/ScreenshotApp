@@ -6,8 +6,8 @@ using ScreenshotApp.Capture;
 namespace ScreenshotApp.Sharing;
 
 /// <summary>
-/// "Share a region" for apps that can only share windows: live frames of the region shown in a
-/// <see cref="MirrorWindow"/>, with an outline marking the area on screen. UI thread only.
+/// "Share a region" for apps that can only share windows: live frames of the region shown in a hidden
+/// <see cref="MirrorWindow"/> (picked in the sharing app), with an outline marking the area on screen. UI thread only.
 /// </summary>
 internal sealed class RegionShare : IDisposable
 {
@@ -17,11 +17,11 @@ internal sealed class RegionShare : IDisposable
     private RegionOutline _outline;
     private bool _disposed;
 
-    /// <summary>The mirror asked for a new region (its menu).</summary>
-    public event Action? ChangeRegionRequested;
-
     /// <summary>The share ended by itself or from the mirror window; the owner should dispose it.</summary>
     public event Action? Ended;
+
+    /// <summary>The hidden window to pick in the sharing app.</summary>
+    public MirrorWindow Mirror => _mirror;
 
     public RegionShare(Rectangle region)
     {
@@ -37,7 +37,6 @@ internal sealed class RegionShare : IDisposable
             _mirror.CloseWindow();
             throw;
         }
-        _mirror.ChangeRegionRequested += () => ChangeRegionRequested?.Invoke();
         _mirror.StopRequested += () => Ended?.Invoke();
         _mirror.ShowFor(_source.Region);
         _outline.Show(true);

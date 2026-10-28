@@ -5,84 +5,88 @@ using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using ScreenshotApp.Capture;
 using ScreenshotApp.Services;
 using Windows.Graphics;
 using Windows.Win32;
 using Windows.Win32.Foundation;
+using Windows.Win32.System.Com;
+using Windows.Win32.UI.Shell;
 using Windows.Win32.UI.WindowsAndMessaging;
 using WinRT.Interop;
 
 namespace ScreenshotApp.Sharing;
 
 /// <summary>
-/// A plain window that shows a live screen region, for apps (Teams) that can share a window but not a region.
-/// It has no title bar so the shared picture is just the region; drag it to move, right-click for options.
-/// It can sit behind other windows (window sharing still sees it) but must not be minimized.
+/// A window that shows a live screen region 1:1, for apps (Teams) that can share a window but not a region.
+/// The user never sees it: it is parked beyond the edge of the virtual screen and has no taskbar button. It stays an
+/// ordinary visible top-level window (unowned, not a tool window, not minimized or cloaked, with a title), because
+/// screen-share pickers leave out anything else, and window capture still gets its content off-screen.
 /// </summary>
 internal sealed class MirrorWindow : Window
 {
-    private const string WindowTitle = "Shared region";
+    public const string WindowTitle = "Shared region";
+    private const int OffScreenGap = 64; // between the virtual screen and the window, in physical pixels
 
     private readonly CanvasDevice _device;
     private readonly CanvasSwapChainPanel _panel = new();
     private readonly object _gate = new(); // swap chain: drawn on the capture thread, resized on the UI thread
-    private readonly HWND _hwnd;
     private CanvasSwapChain? _swapChain;
-    private Size _regionSize;
-    private PointInt32? _dragOffset; // cursor minus window position while dragging
     private bool _closing;
 
-    public event Action? ChangeRegionRequested;
+    public HWND Handle { get; }
+
+    /// <summary>The window was closed from outside (Alt+Tab to it, Alt+F4); the share should end.</summary>
     public event Action? StopRequested;
 
     public MirrorWindow(CanvasDevice device)
     {
         _device = device;
         Title = WindowTitle;
-        _hwnd = new HWND(WindowNative.GetWindowHandle(this));
-        AppIcon.Apply(AppWindow);
+        Handle = new HWND(WindowNative.GetWindowHandle(this));
+        AppIcon.Apply(AppWindow); // shown next to the title in share pickers
         if (AppWindow.Presenter is OverlappedPresenter presenter)
         {
-            presenter.SetBorderAndTitleBar(hasBorder: true, hasTitleBar: false);
-            presenter.IsMinimizable = false; // a minimized window gives window sharing nothing to show
+            presenter.IsMinimizable = false; // a minimized window gives window capture nothing to show
             presenter.IsMaximizable = false;
+            presenter.IsResizable = false;
+            presenter.SetBorderAndTitleBar(hasBorder: false, hasTitleBar: false);
         }
-
-        var root = new Grid { Background = new SolidColorBrush(Colors.Black), Children = { _panel } };
-        root.ContextFlyout = BuildMenu();
-        root.PointerPressed += OnPointerPressed;
-        root.PointerMoved += OnPointerMoved;
-        root.PointerReleased += OnPointerReleased;
-        root.PointerCaptureLost += (_, _) => _dragOffset = null;
-        Content = root;
+        Content = new Grid { Background = new SolidColorBrush(Colors.Black), Children = { _panel } };
 
         _panel.SizeChanged += (_, _) => UpdateSwapChain();
         _panel.CompositionScaleChanged += (_, _) => UpdateSwapChain();
         AppWindow.Closing += (_, e) =>
         {
             if (_closing) return;
-            e.Cancel = true; // Alt+F4: end the share; the owner closes the window, after this event has returned
+            e.Cancel = true; // the owner closes the window, after this event has returned
             DispatcherQueue.TryEnqueue(() => StopRequested?.Invoke());
         };
     }
 
-    /// <summary>Sizes the window to show <paramref name="region"/> 1:1 (if it fits) and puts it where it does not cover it.</summary>
     public void ShowFor(Rectangle region)
     {
-        _regionSize = region.Size;
-        FitToRegion(region);
+        SetRegion(region);
         AppWindow.Show(activateWindow: false);
-        if (Overlaps(region)) SendToBack(); // otherwise the region would show the window showing the region...
+        RemoveTaskbarButton();
     }
 
-    /// <summary>Another region in the same window: resized to it, but left where the user put it.</summary>
+    /// <summary>Client area = region size, the whole window just left of the virtual screen.</summary>
     public void SetRegion(Rectangle region)
     {
-        _regionSize = region.Size;
-        FitToRegion(null);
+        RemoveFrame();
+        // Off-screen first, so a DPI change from moving cannot rescale the size set next.
+        MoveOffScreen();
+        var want = new SizeInt32(region.Width, region.Height);
+        AppWindow.ResizeClient(want);
+        // ResizeClient may still allow for a frame this window does not have: correct by the real client size.
+        if (PInvoke.GetClientRect(Handle, out var client) && (client.right != want.Width || client.bottom != want.Height))
+        {
+            var outer = AppWindow.Size;
+            AppWindow.Resize(new SizeInt32(outer.Width + want.Width - client.right, outer.Height + want.Height - client.bottom));
+        }
+        MoveOffScreen(); // again for the new width
     }
 
     public void CloseWindow()
@@ -107,7 +111,7 @@ internal sealed class MirrorWindow : Window
             double scale = Math.Min(size.Width / src.Width, size.Height / src.Height);
             double w = src.Width * scale, h = src.Height * scale;
             var dest = new Windows.Foundation.Rect((size.Width - w) / 2, (size.Height - h) / 2, w, h);
-            // 1:1 on screen stays pixel-exact; anything else is scaled smoothly.
+            // 1:1 (the normal case) stays pixel-exact; anything else is scaled smoothly.
             bool exact = Math.Abs(scale * _swapChain.Dpi / 96 - 1) < 0.001;
 
             using (var ds = _swapChain.CreateDrawingSession(Colors.Black))
@@ -133,109 +137,49 @@ internal sealed class MirrorWindow : Window
         }
     }
 
-    private MenuFlyout BuildMenu()
+    /// <summary>
+    /// Even without border and title bar the presenter keeps a 3 px dialog frame, which window capture would
+    /// include; without it the captured window is exactly the region.
+    /// </summary>
+    private void RemoveFrame()
     {
-        var menu = new MenuFlyout();
-        menu.Items.Add(Item("Change region…", () => ChangeRegionRequested?.Invoke()));
-        menu.Items.Add(Item("Actual size", () => FitToRegion(null)));
-        menu.Items.Add(Item("Send to back", SendToBack));
-        menu.Items.Add(new MenuFlyoutSeparator());
-        menu.Items.Add(Item("Stop sharing", () => StopRequested?.Invoke()));
-        return menu;
+        const int frame = (int)(WINDOW_STYLE.WS_DLGFRAME | WINDOW_STYLE.WS_BORDER | WINDOW_STYLE.WS_THICKFRAME);
+        int style = PInvoke.GetWindowLong(Handle, WINDOW_LONG_PTR_INDEX.GWL_STYLE);
+        if ((style & frame) == 0) return;
+        PInvoke.SetWindowLong(Handle, WINDOW_LONG_PTR_INDEX.GWL_STYLE, style & ~frame);
+        PInvoke.SetWindowPos(Handle, HWND.Null, 0, 0, 0, 0, SET_WINDOW_POS_FLAGS.SWP_FRAMECHANGED | SET_WINDOW_POS_FLAGS.SWP_NOMOVE
+            | SET_WINDOW_POS_FLAGS.SWP_NOSIZE | SET_WINDOW_POS_FLAGS.SWP_NOZORDER | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE);
+    }
 
-        static MenuFlyoutItem Item(string text, Action action)
-        {
-            var item = new MenuFlyoutItem { Text = text };
-            item.Click += (_, _) => action();
-            return item;
-        }
+    private void MoveOffScreen()
+    {
+        var screen = Monitors.VirtualScreen;
+        AppWindow.Move(new PointInt32(screen.Left - AppWindow.Size.Width - OffScreenGap, screen.Top));
     }
 
     /// <summary>
-    /// Client area = region size (capped to the work area). With a region given, also places the window: on
-    /// another monitor if there is one, else beside the region, else in the corner of the work area.
+    /// Takes the button off the taskbar without changing the window's styles (which would also drop it from
+    /// share pickers). Best effort.
     /// </summary>
-    private void FitToRegion(Rectangle? region)
+    private unsafe void RemoveTaskbarButton()
     {
-        var display = region is { } r0
-            ? PickDisplay(r0)
-            : DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest);
-        var wa = display.WorkArea;
-        double fit = Math.Min(1.0, Math.Min(wa.Width * 0.9 / _regionSize.Width, wa.Height * 0.9 / _regionSize.Height));
-        var want = new SizeInt32(Math.Max(1, (int)(_regionSize.Width * fit)), Math.Max(1, (int)(_regionSize.Height * fit)));
-        AppWindow.ResizeClient(want);
-        // ResizeClient still allows for the title bar this window does not have: correct by the real client size.
-        if (PInvoke.GetClientRect(_hwnd, out var client) && (client.right != want.Width || client.bottom != want.Height))
+        try
         {
-            var outer = AppWindow.Size;
-            AppWindow.Resize(new SizeInt32(outer.Width + want.Width - client.right, outer.Height + want.Height - client.bottom));
+            PInvoke.CoCreateInstance(typeof(TaskbarList).GUID, null, CLSCTX.CLSCTX_INPROC_SERVER, out ITaskbarList* list)
+                .ThrowOnFailure();
+            try
+            {
+                list->HrInit();
+                list->DeleteTab(Handle);
+            }
+            finally
+            {
+                list->Release();
+            }
         }
-        if (region is not { } r) return;
-
-        var size = AppWindow.Size; // outer size, now including the border
-        var area = new Rectangle(wa.X, wa.Y, wa.Width, wa.Height);
-        Point pos;
-        if (!area.IntersectsWith(r))
-            pos = new Point(area.X + (area.Width - size.Width) / 2, area.Y + (area.Height - size.Height) / 2);
-        else if (area.Right - r.Right >= size.Width + 16)
-            pos = new Point(r.Right + 16, Math.Clamp(r.Y, area.Y, area.Bottom - size.Height));
-        else if (r.Left - area.Left >= size.Width + 16)
-            pos = new Point(r.Left - 16 - size.Width, Math.Clamp(r.Y, area.Y, area.Bottom - size.Height));
-        else if (area.Bottom - r.Bottom >= size.Height + 16)
-            pos = new Point(Math.Clamp(r.X, area.X, area.Right - size.Width), r.Bottom + 16);
-        else
-            pos = new Point(area.Right - size.Width, area.Bottom - size.Height);
-        AppWindow.Move(new PointInt32(pos.X, pos.Y));
-    }
-
-    /// <summary>A monitor other than the region's, when there is one.</summary>
-    private static DisplayArea PickDisplay(Rectangle region)
-    {
-        var center = new Point(region.X + region.Width / 2, region.Y + region.Height / 2);
-        DisplayArea? same = null;
-        var all = DisplayArea.FindAll(); // indexed: enumerating this projected list throws InvalidCastException
-        for (int i = 0; i < all.Count; i++)
+        catch (Exception ex)
         {
-            var d = all[i];
-            var b = d.OuterBounds;
-            if (new Rectangle(b.X, b.Y, b.Width, b.Height).Contains(center)) same = d;
-            else return d;
+            Log.Error(ex);
         }
-        return same ?? DisplayArea.Primary;
-    }
-
-    private bool Overlaps(Rectangle region)
-    {
-        var p = AppWindow.Position;
-        var s = AppWindow.Size;
-        return new Rectangle(p.X, p.Y, s.Width, s.Height).IntersectsWith(region);
-    }
-
-    private void SendToBack() =>
-        PInvoke.SetWindowPos(_hwnd, new HWND(1), 0, 0, 0, 0, // HWND_BOTTOM
-            SET_WINDOW_POS_FLAGS.SWP_NOMOVE | SET_WINDOW_POS_FLAGS.SWP_NOSIZE | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE);
-
-    // ---- drag anywhere to move (there is no title bar) ----
-
-    private void OnPointerPressed(object sender, PointerRoutedEventArgs e)
-    {
-        if (!e.GetCurrentPoint(null).Properties.IsLeftButtonPressed) return;
-        PInvoke.GetCursorPos(out var cursor);
-        var pos = AppWindow.Position;
-        _dragOffset = new PointInt32(cursor.X - pos.X, cursor.Y - pos.Y);
-        ((UIElement)sender).CapturePointer(e.Pointer);
-    }
-
-    private void OnPointerMoved(object sender, PointerRoutedEventArgs e)
-    {
-        if (_dragOffset is not { } offset) return;
-        PInvoke.GetCursorPos(out var cursor);
-        AppWindow.Move(new PointInt32(cursor.X - offset.X, cursor.Y - offset.Y));
-    }
-
-    private void OnPointerReleased(object sender, PointerRoutedEventArgs e)
-    {
-        _dragOffset = null;
-        ((UIElement)sender).ReleasePointerCapture(e.Pointer);
     }
 }

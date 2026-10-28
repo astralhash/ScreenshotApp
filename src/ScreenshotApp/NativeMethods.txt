@@ -104,5 +104,9 @@ GetIconInfo
 DrawIconEx
 GetWindowRect
 SetLayeredWindowAttributes
-MonitorFromWindow
 GetClientRect
+CoCreateInstance
+ITaskbarList
+TaskbarList
+GetWindow
+SetWindowLong

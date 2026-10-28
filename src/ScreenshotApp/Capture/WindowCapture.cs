@@ -38,7 +38,7 @@ internal static class WindowCapture
     }
 
     [SupportedOSPlatform("windows10.0.19041.0")]
-    private static async Task<(byte[] Pixels, int Width, int Height)?> GrabAsync(HWND hwnd)
+    internal static async Task<(byte[] Pixels, int Width, int Height)?> GrabAsync(HWND hwnd)
     {
         if (!GraphicsCaptureSession.IsSupported()) return null;
         var item = CaptureInterop.CreateForWindow(hwnd);

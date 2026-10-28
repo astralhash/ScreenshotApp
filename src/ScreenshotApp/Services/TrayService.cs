@@ -15,6 +15,7 @@ internal enum TrayCommand
     Settings,
     Exit,
     ShareRegion,
+    ChangeSharedRegion,
     StopSharing,
 }
 
@@ -87,7 +88,11 @@ internal sealed unsafe class TrayService : IDisposable
             Append(menu, TrayCommand.CaptureWindow, "Capture Window");
             Append(menu, TrayCommand.CaptureFullScreen, "Capture Full Screen");
             PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (string?)null);
-            if (Sharing) Append(menu, TrayCommand.StopSharing, "Stop Sharing Region");
+            if (Sharing)
+            {
+                Append(menu, TrayCommand.ChangeSharedRegion, "Change Shared Region…");
+                Append(menu, TrayCommand.StopSharing, "Stop Sharing Region");
+            }
             else Append(menu, TrayCommand.ShareRegion, "Share Region…");
             PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (string?)null);
             Append(menu, TrayCommand.Settings, "Settings");

@@ -37,6 +37,13 @@ public partial class App : Application
             Exit();
             return;
         }
+        if (Environment.GetCommandLineArgs().Contains("--selftest-share", StringComparer.OrdinalIgnoreCase))
+        {
+            try { await ShareSelfTest.RunAsync(); }
+            catch (Exception ex) { Log.Error(ex); }
+            Exit();
+            return;
+        }
 #endif
 
         _singleInstance = new Mutex(true, "ScreenshotApp.SingleInstance", out bool isFirst);
@@ -129,6 +136,7 @@ public partial class App : Application
             case TrayCommand.CaptureFullScreen: CaptureFullScreen(); break;
             case TrayCommand.Settings: OpenSettings(); break;
             case TrayCommand.ShareRegion: ShareRegion(); break;
+            case TrayCommand.ChangeSharedRegion: ChangeSharedRegion(); break;
             case TrayCommand.StopSharing: StopSharing(); break;
             case TrayCommand.Exit: Shutdown(); break;
         }
@@ -318,8 +326,8 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Starts sharing a region: picks it with the region overlay, then mirrors it live in a window that Teams
-    /// (or any app that shares windows) can share.
+    /// Starts sharing a region: picks it with the region overlay, then mirrors it live in a hidden window that
+    /// Teams (or any app that shares windows) lists in its window picker.
     /// </summary>
     private async void ShareRegion()
     {
@@ -337,9 +345,10 @@ public partial class App : Application
         {
             var share = new RegionShare(region);
             share.Ended += StopSharing;
-            share.ChangeRegionRequested += ChangeSharedRegion;
             _share = share;
             _tray!.Sharing = true;
+            _tray.ShowBalloon("Region ready to share",
+                $"In Teams, share a window and pick \"{MirrorWindow.WindowTitle}\". Stop it from this tray icon.");
         }
         catch (Exception ex)
         {
