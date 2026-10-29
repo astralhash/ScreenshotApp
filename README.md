@@ -25,19 +25,20 @@ Built with C#, .NET 10 and WinUI 3 (Windows App SDK). It is unpackaged, so there
 - Undo / redo, a "Clean" button that restores the original capture, zoom and pan, Mica backdrop, light/dark following the system.
 - Copy and Save flatten the image at full pixel resolution (rendered with Win2D, not screen-scaled).
 
-**Experimental** (turn on *Settings → General → Enable experimental features*)
-- **Share Region…** in the tray menu: pick a screen region and it is mirrored live into a hidden window called
+**Share Region**
+- **Share Region…** in the tray menu (or its hotkey): pick a screen region and it is mirrored live into a hidden window called
   "Shared region". Apps that can share a window but not part of the screen, like Microsoft Teams, list it in their
-  window picker. A thin red frame marks the shared area; change or stop it from the tray menu.
+  window picker. A thin red frame marks the shared area; change or stop it from the tray menu, or press the hotkey again to stop.
 
 ## Hotkeys
 
 | Default | Action |
 | --- | --- |
-| `Ctrl+Shift+Print Screen` | Full screen (monitor under the cursor) |
+| `Ctrl+Print Screen` | Full screen (monitor under the cursor) |
 | `Alt+Print Screen` | Window |
 | `Print Screen` | Region |
 | `Shift+Print Screen` | Region again: the same rectangle as the last region capture, no selection step |
+| `Ctrl+Shift+Print Screen` | Start / stop Share Region (for screensharing apps) |
 
 All of them can be changed or cleared in Settings: click a key box, press the new combination, `Esc` cancels. A key that
 is already used by another app is reported there. Without Ctrl, Alt, Shift or Win only Print Screen, Pause, Scroll Lock
@@ -121,7 +122,6 @@ This project was steered and tested by me and implemented with a coding agent.
 
 - Multi-monitor and mixed-DPI setups have not been tested on real hardware yet.
 - Capture uses a GDI snapshot, so content protected by the system (some video players) can come out black.
-- Window capture picks top-level windows only.
 - Blur and Pixelate act on the captured image, not on other annotations drawn under them.
 - ARM64 is configured in the project but has not been built.
 - Out of scope for now: recording, OCR, scroll capture, uploads, history, pin-to-screen.

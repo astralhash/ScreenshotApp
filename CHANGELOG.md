@@ -1,8 +1,13 @@
 # Changelog
 
+## 0.2.2
+
+- Share Region is no longer experimental: the *Enable experimental features* setting is gone and it is always in the tray menu.
+- New hotkey to start / stop Share Region (default `Ctrl+Shift+Print Screen`). The full screen default is now `Ctrl+Print Screen`.
+
 ## 0.2.1
 
-- Experimental: **Share Region…** (tray menu) mirrors a screen region live into a hidden "Shared region" window, so apps that can only share whole windows, like Microsoft Teams, can share just that region. A red frame marks the area; change or stop it from the tray. Turn it on with the new *Enable experimental features* setting under General.
+- **Share Region…** (tray menu) mirrors a screen region live into a hidden "Shared region" window, so apps that can only share whole windows, like Microsoft Teams, can share just that region. A red frame marks the area; change or stop it from the tray.
 - Window capture now grabs the clicked window itself: windows in front of it are no longer in the shot, and its rounded corners are filled from the screen behind it.
 - Settings has an About section with the version and a link to the GitHub page.
 

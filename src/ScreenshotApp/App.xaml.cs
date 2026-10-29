@@ -103,6 +103,7 @@ public partial class App : Application
                 HotkeyAction.FullScreen => CaptureFullScreen,
                 HotkeyAction.Window => CaptureWindow,
                 HotkeyAction.Region => CaptureRegion,
+                HotkeyAction.ShareRegion => ToggleShareRegion,
                 _ => CaptureRegionRepeat,
             };
             if (Hotkey.Parse(_settings.Current.GetHotkey(action)) is not { } hotkey) continue;
@@ -332,6 +333,12 @@ public partial class App : Application
     /// Starts sharing a region: picks it with the region overlay, then mirrors it live in a hidden window that
     /// Teams (or any app that shares windows) lists in its window picker.
     /// </summary>
+    private void ToggleShareRegion()
+    {
+        if (_share is null) ShareRegion();
+        else StopSharing();
+    }
+
     private async void ShareRegion()
     {
         if (_share is not null || !RegionFrameSource.IsSupported)

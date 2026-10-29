@@ -36,9 +36,6 @@ internal sealed class AppSettings
     /// <summary>Darken the screen outside the selection in the capture overlay (off: crosshair only).</summary>
     public bool DimOverlay { get; set; } = true;
 
-    /// <summary>Shows features still being tried out (currently "Share Region…" in the tray menu).</summary>
-    public bool ExperimentalFeatures { get; set; }
-
     /// <summary>Whether the region-capture zoom lens (Z) was on; remembered from capture to capture.</summary>
     public bool ZoomLensEnabled { get; set; }
 

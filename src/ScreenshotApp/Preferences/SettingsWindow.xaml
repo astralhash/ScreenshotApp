@@ -151,12 +151,6 @@
                                       IsOn="{x:Bind ViewModel.ConfirmRemoveAll, Mode=TwoWay}" />
                         <ToggleSwitch Header="Close the editor when the last clip is closed" OnContent="On" OffContent="Off"
                                       IsOn="{x:Bind ViewModel.CloseEditorWhenEmpty, Mode=TwoWay}" />
-                        <StackPanel Spacing="4">
-                            <ToggleSwitch Header="Enable experimental features" OnContent="On" OffContent="Off"
-                                          IsOn="{x:Bind ViewModel.ExperimentalFeatures, Mode=TwoWay}" />
-                            <TextBlock Style="{StaticResource Hint}"
-                                       Text="Adds &quot;Share Region…&quot; to the tray menu: shows a screen region as a hidden window that Teams and other apps can share." />
-                        </StackPanel>
                     </StackPanel>
                 </Border>
 
