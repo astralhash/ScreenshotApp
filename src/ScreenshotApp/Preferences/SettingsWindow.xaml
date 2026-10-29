@@ -131,6 +131,13 @@
                                       IsOn="{x:Bind ViewModel.DuckEditorForCapture, Mode=TwoWay}" />
                         <ToggleSwitch Header="Include the mouse cursor in captures" OnContent="On" OffContent="Off"
                                       IsOn="{x:Bind ViewModel.CaptureCursor, Mode=TwoWay}" />
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Region and window selection" />
+                            <ComboBox SelectedIndex="{x:Bind ViewModel.OverlayStyleIndex, Mode=TwoWay}" MinWidth="160">
+                                <ComboBoxItem Content="Darken screen + crosshair" />
+                                <ComboBoxItem Content="Crosshair only" />
+                            </ComboBox>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 

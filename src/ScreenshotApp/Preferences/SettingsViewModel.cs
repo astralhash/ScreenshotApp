@@ -43,6 +43,9 @@ internal sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] public partial bool CloseEditorWhenEmpty { get; set; }
     [ObservableProperty] public partial bool DuckEditorForCapture { get; set; }
     [ObservableProperty] public partial bool CaptureCursor { get; set; }
+
+    /// <summary>Capture overlay style: 0 = darken + crosshair, 1 = crosshair only.</summary>
+    [ObservableProperty] public partial int OverlayStyleIndex { get; set; }
     [ObservableProperty] public partial bool ExperimentalFeatures { get; set; }
 
     public IReadOnlyList<HotkeyRow> Hotkeys { get; } = HotkeyActions.All.Select(a => new HotkeyRow(a)).ToList();
@@ -73,6 +76,7 @@ internal sealed partial class SettingsViewModel : ObservableObject
         CloseEditorWhenEmpty = s.CloseEditorWhenEmpty;
         DuckEditorForCapture = s.DuckEditorForCapture;
         CaptureCursor = s.CaptureCursor;
+        OverlayStyleIndex = s.DimOverlay ? 0 : 1;
         ExperimentalFeatures = s.ExperimentalFeatures;
         _loading = false;
     }
@@ -197,6 +201,7 @@ internal sealed partial class SettingsViewModel : ObservableObject
     partial void OnCloseEditorWhenEmptyChanged(bool value) => Changed();
     partial void OnDuckEditorForCaptureChanged(bool value) => Changed();
     partial void OnCaptureCursorChanged(bool value) => Changed();
+    partial void OnOverlayStyleIndexChanged(int value) => Changed();
     partial void OnExperimentalFeaturesChanged(bool value) => Changed();
 
     private void Changed()
@@ -219,6 +224,7 @@ internal sealed partial class SettingsViewModel : ObservableObject
         s.CloseEditorWhenEmpty = CloseEditorWhenEmpty;
         s.DuckEditorForCapture = DuckEditorForCapture;
         s.CaptureCursor = CaptureCursor;
+        s.DimOverlay = OverlayStyleIndex != 1;
         s.ExperimentalFeatures = ExperimentalFeatures;
 
         if (s.LaunchAtStartup != LaunchAtStartup)

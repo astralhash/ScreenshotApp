@@ -186,7 +186,81 @@ public sealed partial class EditorWindow : Window
                 SizeToImage(0, 0); // clamps up to the minimum window size
             }
         }
+        KeepOutOfAvoidArea();
         BringToFront();
+    }
+
+    private System.Drawing.Rectangle? _avoidArea;
+
+    /// <summary>
+    /// A screen area the window must not cover (the region being shared, physical pixels), or null. The window is
+    /// moved out of it whenever it is shown, and right away if it is visible now.
+    /// </summary>
+    internal System.Drawing.Rectangle? AvoidArea
+    {
+        get => _avoidArea;
+        set
+        {
+            _avoidArea = value;
+            if (IsShown) KeepOutOfAvoidArea();
+        }
+    }
+
+    /// <summary>
+    /// Moves the window into the free space beside <see cref="AvoidArea"/>: one it fits in if any (preferring the
+    /// monitor under the cursor), else the largest, shrinking the window to it.
+    /// </summary>
+    private void KeepOutOfAvoidArea()
+    {
+        if (_avoidArea is not { } area) return;
+        var avoid = System.Drawing.Rectangle.Inflate(area, 8, 8); // keep clear of the red outline too
+        var pos = AppWindow.Position;
+        var size = AppWindow.Size;
+        if (!new System.Drawing.Rectangle(pos.X, pos.Y, size.Width, size.Height).IntersectsWith(avoid)) return;
+
+        if (AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Maximized } presenter)
+        {
+            presenter.Restore();
+            size = AppWindow.Size;
+        }
+
+        PInvoke.GetCursorPos(out var pt);
+        System.Drawing.Rectangle? best = null;
+        (bool Fits, bool OnCursor, long Room) bestScore = default;
+        foreach (var monitor in Monitors.GetAll())
+        {
+            var wa = DisplayArea.GetFromRect(new RectInt32(monitor.X, monitor.Y, monitor.Width, monitor.Height),
+                DisplayAreaFallback.Nearest).WorkArea;
+            var work = new System.Drawing.Rectangle(wa.X, wa.Y, wa.Width, wa.Height);
+            bool onCursor = work.Contains(pt.X, pt.Y);
+            foreach (var free in FreeSpaces(work, avoid))
+            {
+                var score = (free.Width >= size.Width && free.Height >= size.Height, onCursor, (long)free.Width * free.Height);
+                if (best is null || score.CompareTo(bestScore) > 0)
+                {
+                    best = free;
+                    bestScore = score;
+                }
+            }
+        }
+        if (best is not { } target) return; // the shared region covers every screen
+
+        int w = Math.Min(size.Width, target.Width), h = Math.Min(size.Height, target.Height);
+        AppWindow.MoveAndResize(new RectInt32(target.X + (target.Width - w) / 2, target.Y + (target.Height - h) / 2, w, h));
+    }
+
+    /// <summary>The parts of <paramref name="work"/> left, right, above and below <paramref name="avoid"/>.</summary>
+    private static IEnumerable<System.Drawing.Rectangle> FreeSpaces(System.Drawing.Rectangle work, System.Drawing.Rectangle avoid)
+    {
+        if (!work.IntersectsWith(avoid))
+        {
+            yield return work;
+            yield break;
+        }
+        if (avoid.Left > work.Left) yield return System.Drawing.Rectangle.FromLTRB(work.Left, work.Top, avoid.Left, work.Bottom);
+        if (avoid.Right < work.Right) yield return System.Drawing.Rectangle.FromLTRB(avoid.Right, work.Top, work.Right, work.Bottom);
+        if (avoid.Top > work.Top) yield return System.Drawing.Rectangle.FromLTRB(work.Left, work.Top, work.Right, avoid.Top);
+        if (avoid.Bottom < work.Bottom) yield return System.Drawing.Rectangle.FromLTRB(work.Left, avoid.Bottom, work.Right, work.Bottom);
     }
 
     /// <summary>Hides the window so it does not appear in a capture that was started from its buttons.</summary>

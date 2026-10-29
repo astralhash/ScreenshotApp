@@ -38,11 +38,21 @@ internal sealed class CaptureOverlay
     /// <summary>True after C copied the colour; cleared when the cursor moves.</summary>
     public bool ColorCopied { get; private set; }
 
+    /// <summary>Darken the frozen screen outside the selection.</summary>
+    public bool Dim { get; }
+
+    /// <summary>Draw crosshair lines through the cursor.</summary>
+    public bool Crosshair { get; }
+
     /// <param name="allowLens">False to keep the zoom lens off (and Z inert) whatever the saved setting, e.g. when
     /// the overlay only picks a region to share.</param>
-    public CaptureOverlay(OverlayMode mode, bool allowLens = true)
+    /// <param name="dim">See <see cref="Dim"/>; off by setting, and while a region is shared (viewers would see it).</param>
+    /// <param name="crosshair">See <see cref="Crosshair"/>; off while a region is shared.</param>
+    public CaptureOverlay(OverlayMode mode, bool allowLens = true, bool dim = true, bool crosshair = true)
     {
         _mode = mode;
+        Dim = dim;
+        Crosshair = crosshair;
         _lensAllowed = mode == OverlayMode.Region && allowLens;
         LensEnabled = _lensAllowed && App.Settings.Current.ZoomLensEnabled;
     }

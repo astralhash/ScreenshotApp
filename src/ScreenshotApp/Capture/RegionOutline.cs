@@ -9,8 +9,9 @@ using Windows.Win32.UI.WindowsAndMessaging;
 namespace ScreenshotApp.Capture;
 
 /// <summary>
-/// A thin coloured frame drawn just outside a live region (so it is never in the region's own frames), made of
-/// four topmost, click-through Win32 strips.
+/// A thin coloured frame around a live region, made of four topmost, click-through Win32 strips. Each side sits
+/// just outside the region, or just inside it where the outside would be off-screen (region on a screen edge).
+/// The strips are excluded from screen capture, so they are never in the shared frames or in screenshots.
 /// </summary>
 internal sealed unsafe class RegionOutline : IDisposable
 {
@@ -26,12 +27,19 @@ internal sealed unsafe class RegionOutline : IDisposable
     {
         EnsureClass();
         int t = Thickness;
+        var monitors = Monitors.GetAll();
+        // The frame's outer box: each side moves inward when the strip outside the region would not be on screen.
+        int left = OnScreen(new(region.X - t, region.Y, t, region.Height), monitors) ? region.X - t : region.X;
+        int right = OnScreen(new(region.Right, region.Y, t, region.Height), monitors) ? region.Right + t : region.Right;
+        int top = OnScreen(new(region.X, region.Y - t, region.Width, t), monitors) ? region.Y - t : region.Y;
+        int bottom = OnScreen(new(region.X, region.Bottom, region.Width, t), monitors) ? region.Bottom + t : region.Bottom;
+        int innerHeight = Math.Max(0, bottom - top - 2 * t);
         Rectangle[] rects =
         [
-            new(region.X - t, region.Y - t, region.Width + 2 * t, t), // top
-            new(region.X - t, region.Bottom, region.Width + 2 * t, t), // bottom
-            new(region.X - t, region.Y, t, region.Height),             // left
-            new(region.Right, region.Y, t, region.Height),             // right
+            new(left, top, right - left, t),               // top
+            new(left, bottom - t, right - left, t),        // bottom
+            new(left, top + t, t, innerHeight),            // left
+            new(right - t, top + t, t, innerHeight),       // right
         ];
         var hInstance = (HINSTANCE)PInvoke.GetModuleHandle((PCWSTR)null).Value;
         for (int i = 0; i < 4; i++)
@@ -46,10 +54,25 @@ internal sealed unsafe class RegionOutline : IDisposable
             if (_strips[i] == HWND.Null) continue;
             // Layered + transparent makes the strip click-through; it still needs an opacity to be drawn at all.
             PInvoke.SetLayeredWindowAttributes(_strips[i], new COLORREF(0), 255, LAYERED_WINDOW_ATTRIBUTES_FLAGS.LWA_ALPHA);
+            // A side drawn inside the region would otherwise show in the shared frames.
+            if (!PInvoke.SetWindowDisplayAffinity(_strips[i], WINDOW_DISPLAY_AFFINITY.WDA_EXCLUDEFROMCAPTURE))
+                Services.Log.Info($"RegionOutline: SetWindowDisplayAffinity failed ({Marshal.GetLastWin32Error()}).");
             var r = rects[i];
             PInvoke.SetWindowPos(_strips[i], new HWND(-1), r.X, r.Y, r.Width, r.Height,
                 SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE);
         }
+    }
+
+    /// <summary>True when <paramref name="strip"/> lies entirely on monitors (they never overlap).</summary>
+    private static bool OnScreen(Rectangle strip, List<Rectangle> monitors)
+    {
+        long covered = 0;
+        foreach (var m in monitors)
+        {
+            var r = Rectangle.Intersect(strip, m);
+            if (!r.IsEmpty) covered += (long)r.Width * r.Height;
+        }
+        return covered == (long)strip.Width * strip.Height;
     }
 
     public void Show(bool visible)

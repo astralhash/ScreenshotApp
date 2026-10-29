@@ -149,6 +149,7 @@ public partial class App : Application
             _editor = new EditorWindow(_settings, _clips!);
             _editor.CaptureRequested += CaptureFromEditor;
             _editor.SettingsRequested += OpenSettings;
+            _editor.AvoidArea = _share?.Region;
         }
         return _editor;
     }
@@ -236,7 +237,9 @@ public partial class App : Application
         if (CaptureOverlay.IsActive) return false;
         try
         {
-            var image = await new CaptureOverlay(mode).RunAsync();
+            // While a region is shared, viewers would see the dimming and crosshair: leave them out.
+            bool sharing = _share is not null;
+            var image = await new CaptureOverlay(mode, dim: !sharing && _settings.Current.DimOverlay, crosshair: !sharing).RunAsync();
             if (image is null) return false;
             if (mode == OverlayMode.Region) RememberRegion(image);
             HandleCapture(image);
@@ -347,8 +350,7 @@ public partial class App : Application
             share.Ended += StopSharing;
             _share = share;
             _tray!.Sharing = true;
-            _tray.ShowBalloon("Region ready to share",
-                $"In Teams, share a window and pick \"{MirrorWindow.WindowTitle}\". Stop it from this tray icon.");
+            if (_editor is not null) _editor.AvoidArea = share.Region;
         }
         catch (Exception ex)
         {
@@ -365,7 +367,11 @@ public partial class App : Application
         if (_share is null) return; // stopped meanwhile
         try
         {
-            if (region is { } r) _share.ChangeRegion(r);
+            if (region is { } r)
+            {
+                _share.ChangeRegion(r);
+                if (_editor is not null) _editor.AvoidArea = _share.Region;
+            }
         }
         catch (Exception ex)
         {
@@ -381,7 +387,9 @@ public partial class App : Application
         if (CaptureOverlay.IsActive) return null;
         try
         {
-            var image = await new CaptureOverlay(OverlayMode.Region, allowLens: false).RunAsync();
+            bool sharing = _share is not null;
+            var image = await new CaptureOverlay(OverlayMode.Region, allowLens: false,
+                dim: !sharing && _settings.Current.DimOverlay, crosshair: !sharing).RunAsync();
             return image is null ? null : new System.Drawing.Rectangle(image.ScreenX, image.ScreenY, image.Width, image.Height);
         }
         catch (Exception ex)
@@ -396,6 +404,7 @@ public partial class App : Application
         _share?.Dispose();
         _share = null;
         if (_tray is not null) _tray.Sharing = false;
+        if (_editor is not null) _editor.AvoidArea = null;
     }
 
     private void Shutdown()

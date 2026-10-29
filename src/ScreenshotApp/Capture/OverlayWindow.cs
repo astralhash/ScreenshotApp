@@ -185,14 +185,15 @@ internal sealed unsafe class OverlayWindow : IDisposable
         try
         {
             int w = _bounds.Width, h = _bounds.Height;
-            PInvoke.BitBlt(_backDc, 0, 0, w, h, _dimDc, 0, 0, ROP_CODE.SRCCOPY);
+            bool dim = _owner.Dim;
+            PInvoke.BitBlt(_backDc, 0, 0, w, h, dim ? _dimDc : _brightDc, 0, 0, ROP_CODE.SRCCOPY);
 
             var sel = _owner.Selection;
             var local = Rectangle.Empty;
             if (sel is { } s)
             {
                 var clipped = Rectangle.Intersect(s, _bounds);
-                if (!clipped.IsEmpty)
+                if (!clipped.IsEmpty && dim)
                 {
                     local = new Rectangle(clipped.X - _bounds.X, clipped.Y - _bounds.Y, clipped.Width, clipped.Height);
                     PInvoke.BitBlt(_backDc, local.X, local.Y, local.Width, local.Height, _brightDc, local.X, local.Y, ROP_CODE.SRCCOPY);
@@ -200,7 +201,7 @@ internal sealed unsafe class OverlayWindow : IDisposable
                 DrawBorder(s);
             }
 
-            DrawCrosshair(_owner.Cursor);
+            if (_owner.Crosshair) DrawCrosshair(_owner.Cursor);
             if (_owner.LensEnabled) DrawLens(_owner.Cursor);
             else if (sel is { } s2 && _owner.ShowSize) DrawLabel(s2, _owner.Cursor);
 

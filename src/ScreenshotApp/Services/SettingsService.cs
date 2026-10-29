@@ -33,6 +33,9 @@ internal sealed class AppSettings
     /// <summary>Hide the editor while a new clip is captured (so it is not in the shot), then bring it back.</summary>
     public bool DuckEditorForCapture { get; set; } = true;
 
+    /// <summary>Darken the screen outside the selection in the capture overlay (off: crosshair only).</summary>
+    public bool DimOverlay { get; set; } = true;
+
     /// <summary>Shows features still being tried out (currently "Share Region…" in the tray menu).</summary>
     public bool ExperimentalFeatures { get; set; }
 

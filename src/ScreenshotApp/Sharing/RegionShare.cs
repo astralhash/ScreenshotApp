@@ -23,6 +23,9 @@ internal sealed class RegionShare : IDisposable
     /// <summary>The hidden window to pick in the sharing app.</summary>
     public MirrorWindow Mirror => _mirror;
 
+    /// <summary>The shared screen area (physical pixels).</summary>
+    public Rectangle Region => _source.Region;
+
     public RegionShare(Rectangle region)
     {
         _mirror = new MirrorWindow(CanvasDevice.GetSharedDevice()); // the device the frame source uses

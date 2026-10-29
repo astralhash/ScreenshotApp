@@ -110,3 +110,4 @@ ITaskbarList
 TaskbarList
 GetWindow
 SetWindowLong
+SetWindowDisplayAffinity
