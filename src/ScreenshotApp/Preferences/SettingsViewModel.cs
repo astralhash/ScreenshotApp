@@ -43,6 +43,7 @@ internal sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] public partial bool CloseEditorWhenEmpty { get; set; }
     [ObservableProperty] public partial bool DuckEditorForCapture { get; set; }
     [ObservableProperty] public partial bool CaptureCursor { get; set; }
+    [ObservableProperty] public partial bool ShareToolbarOnHover { get; set; }
 
     /// <summary>Capture overlay style: 0 = darken + crosshair, 1 = crosshair only.</summary>
     [ObservableProperty] public partial int OverlayStyleIndex { get; set; }
@@ -76,6 +77,7 @@ internal sealed partial class SettingsViewModel : ObservableObject
         DuckEditorForCapture = s.DuckEditorForCapture;
         CaptureCursor = s.CaptureCursor;
         OverlayStyleIndex = s.DimOverlay ? 0 : 1;
+        ShareToolbarOnHover = s.ShareToolbarOnHover;
         _loading = false;
     }
 
@@ -200,6 +202,7 @@ internal sealed partial class SettingsViewModel : ObservableObject
     partial void OnDuckEditorForCaptureChanged(bool value) => Changed();
     partial void OnCaptureCursorChanged(bool value) => Changed();
     partial void OnOverlayStyleIndexChanged(int value) => Changed();
+    partial void OnShareToolbarOnHoverChanged(bool value) => Changed();
 
     private void Changed()
     {
@@ -222,6 +225,7 @@ internal sealed partial class SettingsViewModel : ObservableObject
         s.DuckEditorForCapture = DuckEditorForCapture;
         s.CaptureCursor = CaptureCursor;
         s.DimOverlay = OverlayStyleIndex != 1;
+        s.ShareToolbarOnHover = ShareToolbarOnHover;
 
         if (s.LaunchAtStartup != LaunchAtStartup)
         {

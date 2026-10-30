@@ -30,7 +30,10 @@ Built with C#, .NET 10 and WinUI 3 (Windows App SDK). It is unpackaged, so there
   your screen. **Set Sharing Region** (tray menu, or its hotkey) lets you draw the area you want to show.
 - Then, in your meeting, share the window called **"Shared region"** instead of a screen: everyone sees only that area,
   live. A thin red frame on your screen marks it.
-- To move it, choose **Change Shared Region…** in the tray menu. To end it, choose **Remove Sharing Region**, or press the hotkey again.
+- Rest the cursor on the red frame and it turns into resize arrows, like a window edge: drag an edge to change the width or
+  height, or a corner to change both. At the same time a small toolbar appears where the cursor is, with a handle to move the
+  region and an X to end sharing (switch all of this off in Settings → Sharing region).
+- To end it, choose **Remove Sharing Region** in the tray menu, or press the hotkey again.
 
 ## Hotkeys
 

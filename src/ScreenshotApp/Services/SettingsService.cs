@@ -36,6 +36,9 @@ internal sealed class AppSettings
     /// <summary>Darken the screen outside the selection in the capture overlay (off: crosshair only).</summary>
     public bool DimOverlay { get; set; } = true;
 
+    /// <summary>Sharing region: hovering the red frame shows a toolbar (move, resize, end).</summary>
+    public bool ShareToolbarOnHover { get; set; } = true;
+
     /// <summary>The one-time explanation of Share Region (a tray balloon) has been shown.</summary>
     public bool ShareRegionIntroShown { get; set; }
 

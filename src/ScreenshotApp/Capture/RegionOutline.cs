@@ -26,21 +26,6 @@ internal sealed unsafe class RegionOutline : IDisposable
     public RegionOutline(Rectangle region)
     {
         EnsureClass();
-        int t = Thickness;
-        var monitors = Monitors.GetAll();
-        // The frame's outer box: each side moves inward when the strip outside the region would not be on screen.
-        int left = OnScreen(new(region.X - t, region.Y, t, region.Height), monitors) ? region.X - t : region.X;
-        int right = OnScreen(new(region.Right, region.Y, t, region.Height), monitors) ? region.Right + t : region.Right;
-        int top = OnScreen(new(region.X, region.Y - t, region.Width, t), monitors) ? region.Y - t : region.Y;
-        int bottom = OnScreen(new(region.X, region.Bottom, region.Width, t), monitors) ? region.Bottom + t : region.Bottom;
-        int innerHeight = Math.Max(0, bottom - top - 2 * t);
-        Rectangle[] rects =
-        [
-            new(left, top, right - left, t),               // top
-            new(left, bottom - t, right - left, t),        // bottom
-            new(left, top + t, t, innerHeight),            // left
-            new(right - t, top + t, t, innerHeight),       // right
-        ];
         var hInstance = (HINSTANCE)PInvoke.GetModuleHandle((PCWSTR)null).Value;
         for (int i = 0; i < 4; i++)
         {
@@ -57,6 +42,31 @@ internal sealed unsafe class RegionOutline : IDisposable
             // A side drawn inside the region would otherwise show in the shared frames.
             if (!PInvoke.SetWindowDisplayAffinity(_strips[i], WINDOW_DISPLAY_AFFINITY.WDA_EXCLUDEFROMCAPTURE))
                 Services.Log.Info($"RegionOutline: SetWindowDisplayAffinity failed ({Marshal.GetLastWin32Error()}).");
+        }
+        SetRegion(region);
+    }
+
+    /// <summary>Moves the frame to <paramref name="region"/> (visibility unchanged).</summary>
+    public void SetRegion(Rectangle region)
+    {
+        int t = Thickness;
+        var monitors = Monitors.GetAll();
+        // The frame's outer box: each side moves inward when the strip outside the region would not be on screen.
+        int left = OnScreen(new(region.X - t, region.Y, t, region.Height), monitors) ? region.X - t : region.X;
+        int right = OnScreen(new(region.Right, region.Y, t, region.Height), monitors) ? region.Right + t : region.Right;
+        int top = OnScreen(new(region.X, region.Y - t, region.Width, t), monitors) ? region.Y - t : region.Y;
+        int bottom = OnScreen(new(region.X, region.Bottom, region.Width, t), monitors) ? region.Bottom + t : region.Bottom;
+        int innerHeight = Math.Max(0, bottom - top - 2 * t);
+        Rectangle[] rects =
+        [
+            new(left, top, right - left, t),               // top
+            new(left, bottom - t, right - left, t),        // bottom
+            new(left, top + t, t, innerHeight),            // left
+            new(right - t, top + t, t, innerHeight),       // right
+        ];
+        for (int i = 0; i < 4; i++)
+        {
+            if (_strips[i] == HWND.Null) continue;
             var r = rects[i];
             PInvoke.SetWindowPos(_strips[i], new HWND(-1), r.X, r.Y, r.Width, r.Height,
                 SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE);

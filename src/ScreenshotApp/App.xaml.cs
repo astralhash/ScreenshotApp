@@ -137,7 +137,6 @@ public partial class App : Application
             case TrayCommand.CaptureFullScreen: CaptureFullScreen(); break;
             case TrayCommand.Settings: OpenSettings(); break;
             case TrayCommand.ShareRegion: ShareRegion(); break;
-            case TrayCommand.ChangeSharedRegion: ChangeSharedRegion(); break;
             case TrayCommand.StopSharing: StopSharing(); break;
             case TrayCommand.Exit: Shutdown(); break;
         }
@@ -355,6 +354,8 @@ public partial class App : Application
         {
             var share = new RegionShare(region);
             share.Ended += StopSharing;
+            share.ToolbarEnabled = () => _settings.Current.ShareToolbarOnHover;
+            share.RegionChanged += () => { if (_editor is not null) _editor.AvoidArea = share.Region; };
             _share = share;
             _tray!.Sharing = true;
             if (_editor is not null) _editor.AvoidArea = share.Region;
@@ -376,28 +377,6 @@ public partial class App : Application
         _settings.Current.ShareRegionIntroShown = true;
         try { _settings.Save(); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Log.Error(ex); }
-    }
-
-    private async void ChangeSharedRegion()
-    {
-        if (_share is null) return;
-        _share.ShowOutline(false); // not in the frozen screen the overlay shows
-        var region = await PickShareRegionAsync();
-        if (_share is null) return; // stopped meanwhile
-        try
-        {
-            if (region is { } r)
-            {
-                _share.ChangeRegion(r);
-                if (_editor is not null) _editor.AvoidArea = _share.Region;
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex);
-            _tray?.ShowBalloon("Sharing failed", ex.Message);
-        }
-        _share?.ShowOutline(true);
     }
 
     /// <summary>The selection overlay, used only for its rectangle; null when cancelled.</summary>

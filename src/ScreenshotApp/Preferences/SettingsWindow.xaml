@@ -141,6 +141,17 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Sharing region -->
+                <TextBlock Text="Sharing region" Style="{StaticResource SectionHeader}" />
+                <Border Style="{StaticResource Card}">
+                    <StackPanel Spacing="6">
+                        <ToggleSwitch Header="Resize and toolbar when hovering over the frame" OnContent="On" OffContent="Off"
+                                      IsOn="{x:Bind ViewModel.ShareToolbarOnHover, Mode=TwoWay}" />
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="Rest the cursor on the red frame: it turns into resize arrows (drag an edge, or a corner for both), and a small toolbar with a move handle and an X to end sharing appears." />
+                    </StackPanel>
+                </Border>
+
                 <!-- General -->
                 <TextBlock Text="General" Style="{StaticResource SectionHeader}" />
                 <Border Style="{StaticResource Card}">

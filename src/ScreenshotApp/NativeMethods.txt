@@ -24,6 +24,15 @@ DestroyIcon
 CreatePopupMenu
 AppendMenu
 SetMenuDefaultItem
+CreateRoundRectRgn
+CreateRectRgn
+CombineRgn
+SetWindowRgn
+IDC_SIZEALL
+IDC_SIZENWSE
+IDC_SIZENESW
+IDC_SIZEWE
+IDC_SIZENS
 TrackPopupMenuEx
 DestroyMenu
 SetForegroundWindow
