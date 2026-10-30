@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.3
+
+**Untested:** the new Share Region frame tools below have not been tried in a real screen-sharing call yet.
+
+- Share Region: rest the cursor on the red frame and it turns into resize arrows, like a window edge. Drag an edge to change the width or height, or a corner to change both. A small toolbar appears where the cursor is, with a handle to move the region and an X to end sharing.
+- Share Region tray menu: *Set Sharing Region* / *Remove Sharing Region* (the hotkey is shown beside it). *Change Shared Region…* is gone; use the frame instead. The first time you set a region, a short notice says to share the "Shared region" window.
+- Hotkeys now say `Print` instead of `Print Screen` (for example `Ctrl+Print`). A saved hotkey that can no longer be read falls back to its default, so hotkeys you set to a Print Screen combination are reset.
+- The tray menu shows each action's hotkey. A left click on the tray icon opens the editor; right-click opens the menu.
+
 ## 0.2.2
 
 - Share Region is no longer experimental: the *Enable experimental features* setting is gone and it is always in the tray menu.

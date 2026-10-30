@@ -354,7 +354,6 @@ public partial class App : Application
         {
             var share = new RegionShare(region);
             share.Ended += StopSharing;
-            share.ToolbarEnabled = () => _settings.Current.ShareToolbarOnHover;
             share.RegionChanged += () => { if (_editor is not null) _editor.AvoidArea = share.Region; };
             _share = share;
             _tray!.Sharing = true;

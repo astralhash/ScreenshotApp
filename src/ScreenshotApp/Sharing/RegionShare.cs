@@ -33,9 +33,6 @@ internal sealed class RegionShare : IDisposable
     /// <summary>The region was moved or resized (from the toolbar or <see cref="ChangeRegion"/>).</summary>
     public event Action? RegionChanged;
 
-    /// <summary>Whether the toolbar may appear when the cursor is over the frame; asked at every hover check.</summary>
-    public Func<bool>? ToolbarEnabled { get; set; }
-
     /// <summary>The hidden window to pick in the sharing app.</summary>
     public MirrorWindow Mirror => _mirror;
 
@@ -122,8 +119,8 @@ internal sealed class RegionShare : IDisposable
             _lastNear = now;
             return;
         }
-        bool allowed = ToolbarEnabled?.Invoke() == true && !CaptureOverlay.IsActive;
-        if (!allowed && !_toolbar.IsDragging)
+        // Not while the capture overlay is up: the frame tools would pop up over it.
+        if (CaptureOverlay.IsActive && !_toolbar.IsDragging)
         {
             _toolbar.Hide();
             _grip.Hide();

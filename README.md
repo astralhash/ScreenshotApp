@@ -32,7 +32,7 @@ Built with C#, .NET 10 and WinUI 3 (Windows App SDK). It is unpackaged, so there
   live. A thin red frame on your screen marks it.
 - Rest the cursor on the red frame and it turns into resize arrows, like a window edge: drag an edge to change the width or
   height, or a corner to change both. At the same time a small toolbar appears where the cursor is, with a handle to move the
-  region and an X to end sharing (switch all of this off in Settings → Sharing region).
+  region and an X to end sharing.
 - To end it, choose **Remove Sharing Region** in the tray menu, or press the hotkey again.
 
 ## Hotkeys
