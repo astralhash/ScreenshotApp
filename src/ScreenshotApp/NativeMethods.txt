@@ -23,6 +23,7 @@ CreateIconIndirect
 DestroyIcon
 CreatePopupMenu
 AppendMenu
+SetMenuDefaultItem
 TrackPopupMenuEx
 DestroyMenu
 SetForegroundWindow

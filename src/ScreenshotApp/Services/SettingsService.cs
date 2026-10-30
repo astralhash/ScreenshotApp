@@ -36,11 +36,14 @@ internal sealed class AppSettings
     /// <summary>Darken the screen outside the selection in the capture overlay (off: crosshair only).</summary>
     public bool DimOverlay { get; set; } = true;
 
+    /// <summary>The one-time explanation of Share Region (a tray balloon) has been shown.</summary>
+    public bool ShareRegionIntroShown { get; set; }
+
     /// <summary>Whether the region-capture zoom lens (Z) was on; remembered from capture to capture.</summary>
     public bool ZoomLensEnabled { get; set; }
 
     /// <summary>
-    /// Hotkeys the user changed, per action name, as text ("Alt+Print Screen"); "" for none.
+    /// Hotkeys the user changed, per action name, as text ("Alt+Print"); "" for none.
     /// Actions that are missing use <see cref="HotkeyActions.DefaultHotkey"/>.
     /// </summary>
     public Dictionary<string, string> Hotkeys { get; set; } = new();
@@ -49,7 +52,8 @@ internal sealed class AppSettings
     public RegionRect? LastRegion { get; set; }
 
     public string GetHotkey(HotkeyAction action) =>
-        Hotkeys.TryGetValue(action.ToString(), out var key) ? key : HotkeyActions.DefaultHotkey(action);
+        Hotkeys.TryGetValue(action.ToString(), out var key) && (key == "" || Hotkey.Parse(key) is not null)
+            ? key : HotkeyActions.DefaultHotkey(action); // unreadable saved text falls back to the default
 
     public void SetHotkey(HotkeyAction action, string value) => Hotkeys[action.ToString()] = value;
 

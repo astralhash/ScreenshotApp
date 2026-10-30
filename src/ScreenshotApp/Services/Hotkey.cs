@@ -11,11 +11,11 @@ internal static class HotkeyActions
 
     public static string DefaultHotkey(HotkeyAction action) => action switch
     {
-        HotkeyAction.FullScreen => "Ctrl+Print Screen",
-        HotkeyAction.Window => "Alt+Print Screen",
-        HotkeyAction.Region => "Print Screen",
-        HotkeyAction.ShareRegion => "Ctrl+Shift+Print Screen",
-        _ => "Shift+Print Screen",
+        HotkeyAction.FullScreen => "Ctrl+Print",
+        HotkeyAction.Window => "Alt+Print",
+        HotkeyAction.Region => "Print",
+        HotkeyAction.ShareRegion => "Ctrl+Shift+Print",
+        _ => "Shift+Print",
     };
 
     public static string Label(HotkeyAction action) => action switch
@@ -23,12 +23,12 @@ internal static class HotkeyActions
         HotkeyAction.FullScreen => "Full screen (monitor under the cursor)",
         HotkeyAction.Window => "Window",
         HotkeyAction.Region => "Region",
-        HotkeyAction.ShareRegion => "Start / stop share region (for screensharing apps)",
+        HotkeyAction.ShareRegion => "Set / remove region (for screen sharing apps)",
         _ => "Region (repeat the last one)",
     };
 }
 
-/// <summary>A modifier combination plus one key, stored in settings as text such as "Alt+Print Screen".</summary>
+/// <summary>A modifier combination plus one key, stored in settings as text such as "Alt+Print".</summary>
 internal readonly record struct Hotkey(HOT_KEY_MODIFIERS Modifiers, uint Key)
 {
     private const HOT_KEY_MODIFIERS ModifierMask =
@@ -91,7 +91,7 @@ internal readonly record struct Hotkey(HOT_KEY_MODIFIERS Modifiers, uint Key)
         for (char c = '0'; c <= '9'; c++) d[c] = c.ToString();
         for (uint i = 1; i <= 24; i++) d[0x6F + i] = "F" + i;
 
-        d[0x2C] = "Print Screen"; d[0x13] = "Pause"; d[0x91] = "Scroll Lock";
+        d[0x2C] = "Print"; d[0x13] = "Pause"; d[0x91] = "Scroll Lock";
         d[0x2D] = "Insert"; d[0x2E] = "Delete"; d[0x24] = "Home"; d[0x23] = "End";
         d[0x21] = "Page Up"; d[0x22] = "Page Down";
         d[0x25] = "Left"; d[0x26] = "Up"; d[0x27] = "Right"; d[0x28] = "Down";

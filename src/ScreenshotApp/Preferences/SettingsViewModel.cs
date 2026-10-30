@@ -110,7 +110,7 @@ internal sealed partial class SettingsViewModel : ObservableObject
         if (_recordingRow is not { } row) return false;
         if (Hotkey.Create(modifiers, key) is not { } hotkey)
         {
-            HotkeyMessage = "That key needs Ctrl, Alt, Shift or Win with it (or use Print Screen, Pause or an F key).";
+            HotkeyMessage = "That key needs Ctrl, Alt, Shift or Win with it (or use Print, Pause or an F key).";
             return false;
         }
         EndRecording(apply: false);

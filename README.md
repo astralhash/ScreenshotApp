@@ -26,23 +26,27 @@ Built with C#, .NET 10 and WinUI 3 (Windows App SDK). It is unpackaged, so there
 - Copy and Save flatten the image at full pixel resolution (rendered with Win2D, not screen-scaled).
 
 **Share Region**
-- **Share Region…** in the tray menu (or its hotkey): pick a screen region and it is mirrored live into a hidden window called
-  "Shared region". Apps that can share a window but not part of the screen, like Microsoft Teams, list it in their
-  window picker. A thin red frame marks the shared area; change or stop it from the tray menu, or press the hotkey again to stop.
+- Some screen sharing apps, like Microsoft Teams, can only share a whole screen or a whole window, not just part of
+  your screen. **Set Sharing Region** (tray menu, or its hotkey) lets you draw the area you want to show.
+- Then, in your meeting, share the window called **"Shared region"** instead of a screen: everyone sees only that area,
+  live. A thin red frame on your screen marks it.
+- To move it, choose **Change Shared Region…** in the tray menu. To end it, choose **Remove Sharing Region**, or press the hotkey again.
 
 ## Hotkeys
 
 | Default | Action |
 | --- | --- |
-| `Ctrl+Print Screen` | Full screen (monitor under the cursor) |
-| `Alt+Print Screen` | Window |
-| `Print Screen` | Region |
-| `Shift+Print Screen` | Region again: the same rectangle as the last region capture, no selection step |
-| `Ctrl+Shift+Print Screen` | Start / stop Share Region (for screensharing apps) |
+| `Ctrl+Print` | Full screen (monitor under the cursor) |
+| `Alt+Print` | Window |
+| `Print` | Region |
+| `Shift+Print` | Region again: the same rectangle as the last region capture, no selection step |
+| `Ctrl+Shift+Print` | Set / remove region (for screen sharing apps) |
 
 All of them can be changed or cleared in Settings: click a key box, press the new combination, `Esc` cancels. A key that
-is already used by another app is reported there. Without Ctrl, Alt, Shift or Win only Print Screen, Pause, Scroll Lock
-and the F keys are accepted.
+is already used by another app is reported there. Without Ctrl, Alt, Shift or Win only Print, Pause, Scroll Lock
+and the F keys are accepted. The current hotkeys are also shown in the tray menu.
+
+Left-click the tray icon to open the editor; right-click it for the menu.
 
 If **Print Screen** does nothing, Windows may still hand it to the Snipping Tool: turn off
 *Settings → Accessibility → Keyboard → Use the Print screen button to open screen capture*.

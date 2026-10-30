@@ -358,12 +358,24 @@ public partial class App : Application
             _share = share;
             _tray!.Sharing = true;
             if (_editor is not null) _editor.AvoidArea = share.Region;
+            ShowShareIntroOnce();
         }
         catch (Exception ex)
         {
             Log.Error(ex);
             _tray?.ShowBalloon("Sharing failed", ex.Message);
         }
+    }
+
+    /// <summary>The first time a region is set, explains what to do next (a balloon can be about 250 characters).</summary>
+    private void ShowShareIntroOnce()
+    {
+        if (_settings.Current.ShareRegionIntroShown) return;
+        _tray?.ShowBalloon("Region ready to share",
+            "Now share the window \"Shared region\" in your screen sharing app.");
+        _settings.Current.ShareRegionIntroShown = true;
+        try { _settings.Save(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Log.Error(ex); }
     }
 
     private async void ChangeSharedRegion()

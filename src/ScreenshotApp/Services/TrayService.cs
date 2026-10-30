@@ -74,7 +74,7 @@ internal sealed unsafe class TrayService : IDisposable
         if (mouseMsg == PInvoke.WM_RBUTTONUP || mouseMsg == PInvoke.WM_CONTEXTMENU)
             ShowMenu();
         else if (mouseMsg == PInvoke.WM_LBUTTONUP)
-            _onCommand(TrayCommand.CaptureRegion);
+            _onCommand(TrayCommand.OpenEditor);
     }
 
     private void ShowMenu()
@@ -83,19 +83,20 @@ internal sealed unsafe class TrayService : IDisposable
         try
         {
             Append(menu, TrayCommand.OpenEditor, "Open Editor");
+            PInvoke.SetMenuDefaultItem(menu, (uint)TrayCommand.OpenEditor, 0); // bold: what a left click does
             PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (string?)null);
-            Append(menu, TrayCommand.CaptureRegion, "Capture Region");
-            Append(menu, TrayCommand.CaptureWindow, "Capture Window");
-            Append(menu, TrayCommand.CaptureFullScreen, "Capture Full Screen");
+            Append(menu, TrayCommand.CaptureRegion, "Capture Region", HotkeyAction.Region);
+            Append(menu, TrayCommand.CaptureWindow, "Capture Window", HotkeyAction.Window);
+            Append(menu, TrayCommand.CaptureFullScreen, "Capture Full Screen", HotkeyAction.FullScreen);
             PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (string?)null);
             if (Sharing)
             {
                 Append(menu, TrayCommand.ChangeSharedRegion, "Change Shared Region…");
-                Append(menu, TrayCommand.StopSharing, "Stop Sharing Region");
+                Append(menu, TrayCommand.StopSharing, "Remove Sharing Region", HotkeyAction.ShareRegion);
             }
             else
             {
-                Append(menu, TrayCommand.ShareRegion, "Share Region…");
+                Append(menu, TrayCommand.ShareRegion, "Set Sharing Region", HotkeyAction.ShareRegion);
             }
             PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (string?)null);
             Append(menu, TrayCommand.Settings, "Settings");
@@ -119,8 +120,13 @@ internal sealed unsafe class TrayService : IDisposable
         }
     }
 
-    private static void Append(HMENU menu, TrayCommand command, string text) =>
+    /// <summary>Adds an item; with an action, its configured hotkey is shown right-aligned (after a tab).</summary>
+    private void Append(HMENU menu, TrayCommand command, string text, HotkeyAction? action = null)
+    {
+        if (action is { } a && Hotkey.Parse(App.Settings.Current.GetHotkey(a)) is { } hotkey)
+            text += "\t" + hotkey;
         PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_STRING, (nuint)command, text);
+    }
 
     /// <summary>Draws a 32x32 viewfinder icon (blue rounded square, white corner brackets).</summary>
     private static HICON CreateIcon()
