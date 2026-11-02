@@ -42,6 +42,18 @@ public sealed partial class EditorWindow : Window
     private EditorDocument? _doc;
     private CanvasBitmap? _bitmap;
 
+    // Committed annotations rendered into an offscreen layer at the current zoom; rebuilt only when they
+    // change or the view changes, so drawing a new stroke just blits the cache plus the live preview.
+    private CanvasRenderTarget? _annotationCache;
+    private RectangleF _cacheView;
+    private float _cacheScale;
+    private Guid _cacheDocId;
+    private Guid? _cacheEditingId;
+    private bool _cacheStale = true;
+    private bool _cacheTooLarge; // extreme zoom: the layer would exceed the GPU's texture limit, draw live instead
+
+    private const float CacheMaxSidePixels = 8192;
+
     // View state of the current shot. _zoom is physical screen pixels per image pixel;
     // _offset is the image origin in DIPs. Saved to / restored from the document on switch.
     private double _zoom = 1;
@@ -90,6 +102,11 @@ public sealed partial class EditorWindow : Window
         ViewModel.Interaction.Changed += () =>
         {
             SyncViewRect();
+            // While a preview stroke or the crop box is dragged, only freshly drawn screen content changes;
+            // the committed annotations are untouched and the cached layer stays valid.
+            bool previewOnly = ViewModel.Interaction.Preview is not null
+                || (ViewModel.Tool == ToolKind.Crop && ViewModel.Interaction.IsDragging);
+            if (!previewOnly) _cacheStale = true;
             QueueRedraw();
         };
         ViewModel.Interaction.TextEditRequested += BeginTextEdit;
@@ -452,6 +469,13 @@ public sealed partial class EditorWindow : Window
 
     private void BuildBitmap()
     {
+        // Any rebuild here means a fresh device (loss/restore) or a new document: the annotation
+        // layer is bound to the old device/doc and must be rebuilt with it.
+        _annotationCache?.Dispose();
+        _annotationCache = null;
+        _cacheStale = true;
+        _cacheTooLarge = false;
+
         _bitmap?.Dispose();
         _bitmap = _doc is not { IsLoaded: true }
             ? null
@@ -619,24 +643,87 @@ public sealed partial class EditorWindow : Window
             ds.FillRectangle(_offset.X - i, _offset.Y - i + 3, w + 2 * i, h + 2 * i,
                 Color.FromArgb((byte)(16 - i * 2 > 0 ? 16 - i * 2 : 1), 0, 0, 0));
 
-        // Everything is drawn in image pixels; the transform maps the visible region onto the canvas.
         var image = new Rect(0, 0, _doc.Width, _doc.Height);
-        ds.Transform = Matrix3x2.CreateTranslation(-view.X, -view.Y) * Matrix3x2.CreateScale(s) * Matrix3x2.CreateTranslation(_offset);
-        using (ds.CreateLayer(1f, new Rect(view.X, view.Y, view.Width, view.Height)))
-        {
-            ds.DrawImage(_bitmap, image, image, 1f,
-                _zoom >= 2 ? CanvasImageInterpolation.NearestNeighbor : CanvasImageInterpolation.HighQualityCubic);
+        var imageToHost = Matrix3x2.CreateTranslation(-view.X, -view.Y) * Matrix3x2.CreateScale(s)
+            * Matrix3x2.CreateTranslation(_offset);
 
-            var ctx = new RenderContext(_bitmap);
-            var editing = ViewModel.Interaction.EditingId;
-            foreach (var a in _doc.Annotations)
-                if (a.Id != editing) a.Render(ds, ctx);
-            ViewModel.Interaction.Preview?.Render(ds, ctx);
+        // The view region maps exactly onto the bitmap, so no clip layer is needed for it.
+        ds.Transform = imageToHost;
+        ds.DrawImage(_bitmap, image, image, 1f,
+            _zoom >= 2 ? CanvasImageInterpolation.NearestNeighbor : CanvasImageInterpolation.HighQualityCubic);
+
+        // Committed annotations come from a cached layer that only rebuilds when they change, the zoom
+        // changes or the visible region changes; drawing a stroke is a blit of it plus the live preview.
+        ds.Transform = Matrix3x2.Identity;
+        var cache = EnsureAnnotationCache(sender, view, s);
+        if (cache is not null) ds.DrawImage(cache, _offset);
+        else if (_cacheTooLarge)
+        {
+            // Fallback for extreme zoom (layer would exceed the texture limit): the pre-cache way.
+            ds.Transform = imageToHost;
+            using (ds.CreateLayer(1f, new Rect(view.X, view.Y, view.Width, view.Height)))
+            {
+                var ctx = new RenderContext(_bitmap);
+                foreach (var a in _doc.Annotations)
+                    if (a.Id != ViewModel.Interaction.EditingId) a.Render(ds, ctx);
+            }
+            ds.Transform = Matrix3x2.Identity;
         }
 
-        ds.Transform = Matrix3x2.Identity;
+        // The stroke being drawn is the only part that changes on every pointer move.
+        if (ViewModel.Interaction.Preview is { } preview)
+        {
+            ds.Transform = imageToHost;
+            using (ds.CreateLayer(1f, new Rect(view.X, view.Y, view.Width, view.Height)))
+                preview.Render(ds, new RenderContext(_bitmap));
+            ds.Transform = Matrix3x2.Identity;
+        }
+
         if (ViewModel.Tool == ToolKind.Crop) DrawCropOverlay(ds, s);
         else if (ViewModel.Interaction.Selected is { } selected) DrawSelection(ds, selected);
+    }
+
+    /// <summary>The cached annotation layer, rebuilt when invalid. No annotations: no layer to build.</summary>
+    private CanvasRenderTarget? EnsureAnnotationCache(CanvasControl canvas, RectangleF view, float s)
+    {
+        if (_doc is null || _bitmap is null) return _annotationCache;
+
+        bool ready = !_cacheStale && _cacheView == view && Math.Abs(_cacheScale - s) < 1e-4f
+            && _cacheDocId == _doc.Id && _cacheEditingId == ViewModel.Interaction.EditingId
+            && (_annotationCache is not null || _doc.Annotations.Count == 0 || _cacheTooLarge);
+        if (ready) return _annotationCache;
+
+        _annotationCache?.Dispose();
+        _annotationCache = null;
+        _cacheView = view;
+        _cacheScale = s;
+        _cacheDocId = _doc.Id;
+        _cacheEditingId = ViewModel.Interaction.EditingId;
+        _cacheStale = false;
+        _cacheTooLarge = false;
+        if (_doc.Annotations.Count == 0) return null;
+
+        // One canvas DIP per rendered pixel (plus the control's DPI), so vector strokes stay crisp. At
+        // extreme zoom a full-view layer would outgrow the GPU's texture limit; draw it live instead.
+        if (view.Width * s > CacheMaxSidePixels || view.Height * s > CacheMaxSidePixels)
+        {
+            _cacheTooLarge = true;
+            return null;
+        }
+        var target = new CanvasRenderTarget(canvas, view.Width * s, view.Height * s, canvas.Dpi);
+        using (var ds = target.CreateDrawingSession())
+        {
+            ds.Clear(Colors.Transparent);
+            ds.Transform = Matrix3x2.CreateTranslation(-view.X, -view.Y) * Matrix3x2.CreateScale(s);
+            using (ds.CreateLayer(1f, new Rect(view.X, view.Y, view.Width, view.Height)))
+            {
+                var ctx = new RenderContext(_bitmap);
+                foreach (var a in _doc.Annotations)
+                    if (a.Id != ViewModel.Interaction.EditingId) a.Render(ds, ctx);
+            }
+        }
+        _annotationCache = target;
+        return target;
     }
 
     /// <summary>Selection outline and handles at a constant on-screen size.</summary>
