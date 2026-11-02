@@ -87,9 +87,17 @@ internal class PathAnnotation : Annotation
         builder.EndFigure(CanvasFigureLoop.Open);
 
         using var geometry = CanvasGeometry.CreatePath(builder);
-        using var style = new CanvasStrokeStyle { StartCap = Cap, EndCap = Cap, LineJoin = CanvasLineJoin.Round };
-        ds.DrawGeometry(geometry, EffectiveColor, EffectiveWidth, style);
+        ds.DrawGeometry(geometry, EffectiveColor, EffectiveWidth, GetStyle());
     }
+
+    // One stroke style per annotation object; built lazily so the subclass caps apply.
+    private CanvasStrokeStyle? _style;
+    private CanvasStrokeStyle GetStyle() => _style ??= new CanvasStrokeStyle
+    {
+        StartCap = Cap,
+        EndCap = Cap,
+        LineJoin = CanvasLineJoin.Round,
+    };
 
     public override bool HitTest(Vector2 p, float tolerance)
     {

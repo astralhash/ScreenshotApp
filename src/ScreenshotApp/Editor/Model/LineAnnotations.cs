@@ -32,10 +32,13 @@ internal class LineAnnotation : Annotation
         else P1 = shift ? HandleGeometry.SnapAngle(P0, position) : position;
     }
 
+    // One stroke style per object, reused across renders.
+    private CanvasStrokeStyle? _style;
+    private CanvasStrokeStyle Style => _style ??= new() { StartCap = CanvasCapStyle.Round, EndCap = CanvasCapStyle.Round };
+
     public override void Render(CanvasDrawingSession ds, RenderContext ctx)
     {
-        using var style = new CanvasStrokeStyle { StartCap = CanvasCapStyle.Round, EndCap = CanvasCapStyle.Round };
-        ds.DrawLine(P0, P1, Color, StrokeWidth, style);
+        ds.DrawLine(P0, P1, Color, StrokeWidth, Style);
     }
 
     public override bool HitTest(Vector2 p, float tolerance) =>
@@ -47,6 +50,10 @@ internal class LineAnnotation : Annotation
 /// <summary>Line with a filled arrow head at <see cref="LineAnnotation.P1"/>.</summary>
 internal sealed class ArrowAnnotation : LineAnnotation
 {
+    // One stroke style per object, reused across renders.
+    private CanvasStrokeStyle? _style;
+    private CanvasStrokeStyle Style => _style ??= new() { StartCap = CanvasCapStyle.Round, EndCap = CanvasCapStyle.Flat };
+
     public override void Render(CanvasDrawingSession ds, RenderContext ctx)
     {
         var dir = P1 - P0;
@@ -61,7 +68,7 @@ internal sealed class ArrowAnnotation : LineAnnotation
 
         using var style = new CanvasStrokeStyle { StartCap = CanvasCapStyle.Round, EndCap = CanvasCapStyle.Flat };
         // Run the shaft slightly into the head so there is no seam.
-        ds.DrawLine(P0, P1 - u * (head * 0.8f), Color, StrokeWidth, style);
+        ds.DrawLine(P0, P1 - u * (head * 0.8f), Color, StrokeWidth, Style);
         using var tri = CanvasGeometry.CreatePolygon(ds, new[] { P1, baseCenter + n * halfWidth, baseCenter - n * halfWidth });
         ds.FillGeometry(tri, Color);
     }
