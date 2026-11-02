@@ -49,6 +49,7 @@ public sealed partial class EditorWindow : Window
     private bool _fitMode = true;
 
     private bool _spaceDown, _panning, _drawing, _sized;
+    private bool _redrawQueued; // guards against queueing several redraws within one composition frame
     private RectangleF _viewRect;
     private bool _pressHandledByHost;
 
@@ -89,7 +90,7 @@ public sealed partial class EditorWindow : Window
         ViewModel.Interaction.Changed += () =>
         {
             SyncViewRect();
-            Canvas.Invalidate();
+            QueueRedraw();
         };
         ViewModel.Interaction.TextEditRequested += BeginTextEdit;
         ViewModel.PropertyChanged += (_, e) =>
@@ -409,7 +410,7 @@ public sealed partial class EditorWindow : Window
         _bitmap = null;
         if (doc is null)
         {
-            Canvas.Invalidate();
+            QueueRedraw();
             return;
         }
 
@@ -435,7 +436,7 @@ public sealed partial class EditorWindow : Window
             if (_doc != doc) return; // the user moved on while it was decoding
         }
         BuildBitmap();
-        Canvas.Invalidate();
+        QueueRedraw();
 
         bool released = false;
         foreach (var other in ViewModel.Shots)
@@ -606,6 +607,7 @@ public sealed partial class EditorWindow : Window
 
     private void Canvas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
     {
+        _redrawQueued = false;
         if (_bitmap is null || _doc is null) return;
         var ds = args.DrawingSession;
         var view = ViewRect;
@@ -712,11 +714,22 @@ public sealed partial class EditorWindow : Window
         PositionTextEditor();
     }
 
+    /// <summary>
+    /// Marks the whole canvas stale without stacking redbacks: pointer storms call Invalidate several times
+    /// per composition frame, but one redraw per frame is all the GPU can use.
+    /// </summary>
+    private void QueueRedraw()
+    {
+        if (_redrawQueued) return;
+        _redrawQueued = true;
+        Canvas.Invalidate();
+    }
+
     private void Redraw()
     {
         ClampOffset();
         ApplyZoomText();
-        Canvas.Invalidate();
+        QueueRedraw();
     }
 
     private void FitToWindow()
@@ -909,7 +922,7 @@ public sealed partial class EditorWindow : Window
         PositionTextEditor();
         TextEditor.Focus(FocusState.Programmatic);
         if (!isNew) TextEditor.SelectAll();
-        Canvas.Invalidate();
+        QueueRedraw();
     }
 
     private void PositionTextEditor()
