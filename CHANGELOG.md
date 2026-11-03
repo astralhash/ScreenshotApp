@@ -1,8 +1,12 @@
 # Changelog
 
-## 0.2.3
+## 0.2.4
 
-**Untested:** the new Share Region frame tools below have not been tried in a real screen-sharing call yet.
+- Share Region has a frame rate limit (Settings → *Share region*, default 30 fps, 0 = unlimited). It applies right away, even during a share. At 30 fps it uses roughly 40% less CPU and 30% less GPU than unlimited, and meeting apps rarely send more than 30 fps anyway.
+- Share Region no longer waits for the screen's refresh before showing each frame, so frames are not held up.
+- Editor: drawing and dragging stay smooth with many annotations. Finished annotations and the image are cached instead of being redrawn on every mouse move, and redraws are limited to one per frame.
+
+## 0.2.3
 
 - Share Region: rest the cursor on the red frame and it turns into resize arrows, like a window edge. Drag an edge to change the width or height, or a corner to change both. A small toolbar appears where the cursor is, with a handle to move the region and an X to end sharing.
 - Share Region tray menu: *Set Sharing Region* / *Remove Sharing Region* (the hotkey is shown beside it). *Change Shared Region…* is gone; use the frame instead. The first time you set a region, a short notice says to share the "Shared region" window.

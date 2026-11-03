@@ -34,6 +34,7 @@ Built with C#, .NET 10 and WinUI 3 (Windows App SDK). It is unpackaged, so there
   height, or a corner to change both. At the same time a small toolbar appears where the cursor is, with a handle to move the
   region and an X to end sharing.
 - To end it, choose **Remove Sharing Region** in the tray menu, or press the hotkey again.
+- The mirror runs at up to 30 frames per second by default; change it in Settings → *Share region* (0 = unlimited).
 
 ## Hotkeys
 
