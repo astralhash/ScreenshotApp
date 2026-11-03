@@ -699,14 +699,11 @@ public sealed partial class EditorWindow : Window
         _cacheEditingId = ViewModel.Interaction.EditingId;
         _cacheStale = false;
         _cacheTooLarge = false;
-        _cacheView = view;
-        _cacheScale = s;
-        _cacheDocId = _doc.Id;
-        _cacheEditingId = ViewModel.Interaction.EditingId;
 
         // One canvas DIP per rendered pixel (plus the control's DPI), so vector strokes stay crisp. At
         // extreme zoom a full-view layer would outgrow the GPU's texture limit; draw it live instead.
-        if (view.Width * s > CacheMaxSidePixels || view.Height * s > CacheMaxSidePixels)
+        float pixelsPerDip = canvas.Dpi / 96f;
+        if (view.Width * s * pixelsPerDip > CacheMaxSidePixels || view.Height * s * pixelsPerDip > CacheMaxSidePixels)
         {
             _cacheTooLarge = true;
             return null;
@@ -808,7 +805,7 @@ public sealed partial class EditorWindow : Window
     }
 
     /// <summary>
-    /// Marks the whole canvas stale without stacking redbacks: pointer storms call Invalidate several times
+    /// Marks the whole canvas stale without stacking redraws: pointer storms call Invalidate several times
     /// per composition frame, but one redraw per frame is all the GPU can use.
     /// </summary>
     private void QueueRedraw()

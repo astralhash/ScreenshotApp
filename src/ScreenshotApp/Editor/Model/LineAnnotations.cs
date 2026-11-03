@@ -66,7 +66,6 @@ internal sealed class ArrowAnnotation : LineAnnotation
         float halfWidth = head * 0.5f;
         var baseCenter = P1 - u * head;
 
-        using var style = new CanvasStrokeStyle { StartCap = CanvasCapStyle.Round, EndCap = CanvasCapStyle.Flat };
         // Run the shaft slightly into the head so there is no seam.
         ds.DrawLine(P0, P1 - u * (head * 0.8f), Color, StrokeWidth, Style);
         using var tri = CanvasGeometry.CreatePolygon(ds, new[] { P1, baseCenter + n * halfWidth, baseCenter - n * halfWidth });
