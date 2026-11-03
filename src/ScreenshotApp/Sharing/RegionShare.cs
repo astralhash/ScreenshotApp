@@ -180,7 +180,7 @@ internal sealed class RegionShare : IDisposable
 
     private RegionFrameSource StartSource(Rectangle region)
     {
-        var source = new RegionFrameSource(region, includeCursor: true);
+        var source = new RegionFrameSource(region, includeCursor: true) { MaxFps = () => App.Settings.Current.ShareRegionFps };
         source.FrameArrived += _mirror.Draw;
         source.Stopped += () => _dispatcher.TryEnqueue(() =>
         {

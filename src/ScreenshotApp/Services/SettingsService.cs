@@ -39,6 +39,9 @@ internal sealed class AppSettings
     /// <summary>The one-time explanation of Share Region (a tray balloon) has been shown.</summary>
     public bool ShareRegionIntroShown { get; set; }
 
+    /// <summary>Most frames per second the Share Region mirror shows; 0 = every captured frame (up to the refresh rate).</summary>
+    public int ShareRegionFps { get; set; } = 30;
+
     /// <summary>Whether the region-capture zoom lens (Z) was on; remembered from capture to capture.</summary>
     public bool ZoomLensEnabled { get; set; }
 

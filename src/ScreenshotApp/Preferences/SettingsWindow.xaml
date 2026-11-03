@@ -141,6 +141,19 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Share Region -->
+                <TextBlock Text="Share region" Style="{StaticResource SectionHeader}" />
+                <Border Style="{StaticResource Card}">
+                    <StackPanel Spacing="6">
+                        <NumberBox Header="Frame rate limit (frames per second)" HorizontalAlignment="Left" MinWidth="160"
+                                   Minimum="0" Maximum="1000" SmallChange="5" LargeChange="15"
+                                   SpinButtonPlacementMode="Inline"
+                                   Value="{x:Bind ViewModel.ShareRegionFps, Mode=TwoWay}" />
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="0 = unlimited (up to your screen's refresh rate). Lower values use less CPU and GPU; most meeting apps send 15–30 fps anyway. Applies right away." />
+                    </StackPanel>
+                </Border>
+
                 <!-- General -->
                 <TextBlock Text="General" Style="{StaticResource SectionHeader}" />
                 <Border Style="{StaticResource Card}">

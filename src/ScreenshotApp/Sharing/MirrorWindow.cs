@@ -106,19 +106,26 @@ internal sealed class MirrorWindow : Window
         lock (_gate)
         {
             if (_swapChain is null) return;
-            var size = _swapChain.Size; // DIPs
-            var src = frame.Source;     // bitmap pixels (= DIPs at 96 dpi)
-            double scale = Math.Min(size.Width / src.Width, size.Height / src.Height);
-            double w = src.Width * scale, h = src.Height * scale;
-            var dest = new Windows.Foundation.Rect((size.Width - w) / 2, (size.Height - h) / 2, w, h);
-            // 1:1 (the normal case) stays pixel-exact; anything else is scaled smoothly.
-            bool exact = Math.Abs(scale * _swapChain.Dpi / 96 - 1) < 0.001;
-
-            using (var ds = _swapChain.CreateDrawingSession(Colors.Black))
-                ds.DrawImage(frame.Bitmap, dest, src, 1f,
-                    exact ? CanvasImageInterpolation.NearestNeighbor : CanvasImageInterpolation.Linear);
-            _swapChain.Present();
+            Present(frame.Bitmap, frame.Source);
         }
+    }
+
+    /// <summary>Draws <paramref name="src"/> of <paramref name="bitmap"/> to the swap chain and presents it; under <see cref="_gate"/>.</summary>
+    private void Present(CanvasBitmap bitmap, Windows.Foundation.Rect src)
+    {
+        var size = _swapChain!.Size; // DIPs; src is in bitmap pixels (= DIPs at 96 dpi)
+        double scale = Math.Min(size.Width / src.Width, size.Height / src.Height);
+        double w = src.Width * scale, h = src.Height * scale;
+        var dest = new Windows.Foundation.Rect((size.Width - w) / 2, (size.Height - h) / 2, w, h);
+        // 1:1 (the normal case) stays pixel-exact; anything else is scaled smoothly.
+        bool exact = Math.Abs(scale * _swapChain.Dpi / 96 - 1) < 0.001;
+
+        using (var ds = _swapChain.CreateDrawingSession(Colors.Black))
+            ds.DrawImage(bitmap, dest, src, 1f,
+                exact ? CanvasImageInterpolation.NearestNeighbor : CanvasImageInterpolation.Linear);
+        // No vsync wait: frames already come at most once per refresh, and blocking here would stall the
+        // capture thread (and its 2-buffer frame pool) for up to a refresh interval.
+        _swapChain.Present(0);
     }
 
     private void UpdateSwapChain()

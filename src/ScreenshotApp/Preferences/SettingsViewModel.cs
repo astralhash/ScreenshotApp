@@ -47,6 +47,9 @@ internal sealed partial class SettingsViewModel : ObservableObject
     /// <summary>Capture overlay style: 0 = darken + crosshair, 1 = crosshair only.</summary>
     [ObservableProperty] public partial int OverlayStyleIndex { get; set; }
 
+    /// <summary>Share Region frame limit; 0 = unlimited. A double for NumberBox.</summary>
+    [ObservableProperty] public partial double ShareRegionFps { get; set; }
+
     public IReadOnlyList<HotkeyRow> Hotkeys { get; } = HotkeyActions.All.Select(a => new HotkeyRow(a)).ToList();
 
     [ObservableProperty] public partial string HotkeyMessage { get; set; } = "";
@@ -76,6 +79,7 @@ internal sealed partial class SettingsViewModel : ObservableObject
         DuckEditorForCapture = s.DuckEditorForCapture;
         CaptureCursor = s.CaptureCursor;
         OverlayStyleIndex = s.DimOverlay ? 0 : 1;
+        ShareRegionFps = s.ShareRegionFps;
         _loading = false;
     }
 
@@ -200,6 +204,7 @@ internal sealed partial class SettingsViewModel : ObservableObject
     partial void OnDuckEditorForCaptureChanged(bool value) => Changed();
     partial void OnCaptureCursorChanged(bool value) => Changed();
     partial void OnOverlayStyleIndexChanged(int value) => Changed();
+    partial void OnShareRegionFpsChanged(double value) => Changed();
     private void Changed()
     {
         OnPropertyChanged(nameof(NoTargets));
@@ -221,6 +226,7 @@ internal sealed partial class SettingsViewModel : ObservableObject
         s.DuckEditorForCapture = DuckEditorForCapture;
         s.CaptureCursor = CaptureCursor;
         s.DimOverlay = OverlayStyleIndex != 1;
+        if (!double.IsNaN(ShareRegionFps)) s.ShareRegionFps = (int)Math.Clamp(Math.Round(ShareRegionFps), 0, 1000);
 
         if (s.LaunchAtStartup != LaunchAtStartup)
         {

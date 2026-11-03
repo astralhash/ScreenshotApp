@@ -31,6 +31,8 @@ internal sealed class RegionFrameSource : IDisposable
     private readonly Windows.Graphics.SizeInt32 _monitorSize;
     private readonly Windows.Foundation.Rect _source;
     private bool _stopped;
+    private long _lastDelivered;  // Stopwatch slot of the last delivered frame (for MaxFps)
+    private Timer? _throttle;     // collects a frame held back by MaxFps
 
     [SupportedOSPlatformGuard("windows10.0.19041.0")]
     public static bool IsSupported =>
@@ -69,7 +71,19 @@ internal sealed class RegionFrameSource : IDisposable
 
     public void Start() => _session.StartCapture();
 
-    private void OnFrameArrived(Direct3D11CaptureFramePool pool, object _)
+    /// <summary>
+    /// Most frames per second to deliver, read for every frame (so a change applies at once); 0 or less = all of them.
+    /// </summary>
+    public Func<int> MaxFps { get; init; } = () => 0;
+
+    private void OnFrameArrived(Direct3D11CaptureFramePool pool, object _) => Deliver(fromTimer: false);
+
+    /// <summary>
+    /// Hands the newest frame to <see cref="FrameArrived"/>. Under a frame rate limit a frame that comes too soon is
+    /// left in the pool and a timer collects it when its turn comes: capture pauses while the pool is full, so frames
+    /// over the limit cost almost nothing, and the last change before the screen goes still still gets through.
+    /// </summary>
+    private void Deliver(bool fromTimer)
     {
         bool lost = false;
         lock (_gate)
@@ -77,8 +91,30 @@ internal sealed class RegionFrameSource : IDisposable
             if (_stopped) return;
             try
             {
-                using var frame = pool.TryGetNextFrame();
+                long now = System.Diagnostics.Stopwatch.GetTimestamp();
+                int fps = MaxFps();
+                long interval = fps > 0 ? System.Diagnostics.Stopwatch.Frequency / fps : 0;
+                long due = _lastDelivered + interval;
+                // A little early still counts: frames jitter and the timer only ticks every ~15 ms.
+                if (!fromTimer && fps > 0 && now < due - interval / 4)
+                {
+                    long ms = Math.Max(1, (due - now) * 1000 / System.Diagnostics.Stopwatch.Frequency + 1);
+                    (_throttle ??= new Timer(_ => Deliver(fromTimer: true))).Change(ms, Timeout.Infinite);
+                    return;
+                }
+
+                // Only the newest of the frames waiting in the pool is shown.
+                Direct3D11CaptureFrame? frame = null;
+                while (_pool.TryGetNextFrame() is { } next)
+                {
+                    frame?.Dispose();
+                    frame = next;
+                }
+                using var newest = frame;
                 if (frame is null) return;
+                // Keep to the slot the frame was due in, so early and late ones even out at the limit
+                // (unless it is a whole interval late: the screen was still).
+                _lastDelivered = fps > 0 && now - due < interval ? due : now;
                 // The region was measured against the monitor as it was; a new resolution makes it meaningless.
                 if (frame.ContentSize.Width != _monitorSize.Width || frame.ContentSize.Height != _monitorSize.Height)
                     lost = true;
@@ -120,6 +156,7 @@ internal sealed class RegionFrameSource : IDisposable
         lock (_gate)
         {
             _stopped = true; // a frame being handled finishes first; later ones are dropped
+            _throttle?.Dispose();
             _session.Dispose();
             _pool.Dispose();
         }
