@@ -281,7 +281,7 @@
                             <Grid Width="160" Height="90" CornerRadius="4" Background="Transparent"
                                   Tag="{x:Bind}" ContextRequested="Thumb_ContextRequested"
                                   PointerEntered="Thumb_PointerEntered" PointerExited="Thumb_PointerExited">
-                                <Image Source="{x:Bind Thumbnail}" Stretch="Uniform" />
+                                <Image Source="{x:Bind Thumbnail, Mode=OneWay}" Stretch="Uniform" />
                                 <Button Tag="{x:Bind}" Click="RemoveShot_Click" Visibility="Collapsed"
                                         HorizontalAlignment="Right" VerticalAlignment="Top" Margin="4"
                                         Width="22" Height="22" Padding="0" CornerRadius="11"
@@ -347,7 +347,7 @@
                                         <!-- Same size as a film-strip thumbnail -->
                                         <DataTemplate x:DataType="local:EditorDocument">
                                             <Border Width="160" Height="90" CornerRadius="4">
-                                                <Image Source="{x:Bind Thumbnail}" Stretch="Uniform" />
+                                                <Image Source="{x:Bind Thumbnail, Mode=OneWay}" Stretch="Uniform" />
                                             </Border>
                                         </DataTemplate>
                                     </GridView.ItemTemplate>

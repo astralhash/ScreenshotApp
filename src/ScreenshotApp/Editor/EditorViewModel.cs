@@ -214,6 +214,9 @@ internal sealed partial class EditorViewModel : ObservableObject
 
     partial void OnSelectedShotChanged(EditorDocument? oldValue, EditorDocument? newValue)
     {
+        _thumbTimer.Stop();
+        FlushThumbnail(); // before the old clip's pixels are released
+
         if (oldValue is not null)
         {
             oldValue.Commands.Changed -= OnCommandsChanged;
@@ -228,9 +231,31 @@ internal sealed partial class EditorViewModel : ObservableObject
         RefreshUndoRedo();
     }
 
+    // Film-strip thumbnail refresh, debounced so a burst of edits renders once.
+    private readonly DispatcherQueueTimer _thumbTimer;
+    private EditorDocument? _thumbPending;
+
+    private void ScheduleThumbnail(EditorDocument shot)
+    {
+        if (_thumbPending is { } other && other != shot) other.RefreshThumbnail(); // switching clips: finish the old one now
+        _thumbPending = shot;
+        _thumbTimer.Stop();
+        _thumbTimer.Start();
+    }
+
+    private void FlushThumbnail()
+    {
+        _thumbPending?.RefreshThumbnail();
+        _thumbPending = null;
+    }
+
     private void OnCommandsChanged()
     {
-        if (SelectedShot is { } shot) shot.Dirty = true; // edited since last save
+        if (SelectedShot is { } shot)
+        {
+            shot.Dirty = true; // edited since last save
+            ScheduleThumbnail(shot);
+        }
         _store.ScheduleSave();
         RefreshUndoRedo();
         Interaction.RaiseChanged();
@@ -293,6 +318,11 @@ internal sealed partial class EditorViewModel : ObservableObject
         _widthSaveTimer.Interval = TimeSpan.FromMilliseconds(600);
         _widthSaveTimer.IsRepeating = false;
         _widthSaveTimer.Tick += (_, _) => SaveToolStyles();
+
+        _thumbTimer = DispatcherQueue.GetForCurrentThread().CreateTimer();
+        _thumbTimer.Interval = TimeSpan.FromMilliseconds(250);
+        _thumbTimer.IsRepeating = false;
+        _thumbTimer.Tick += (_, _) => FlushThumbnail();
 
         foreach (var tool in Enum.GetValues<ToolKind>().Where(t => t is not (ToolKind.Select or ToolKind.Crop)))
         {

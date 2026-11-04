@@ -75,6 +75,7 @@ internal sealed class ClipStore
                     if (dto.Crop is { Length: 4 } c) doc.Crop.Rect = new System.Drawing.RectangleF(c[0], c[1], c[2], c[3]);
                     foreach (var a in dto.Annotations.Select(AnnotationSerializer.FromDto).OfType<Annotation>())
                         doc.Annotations.Add(a);
+                    doc.RefreshThumbnail(); // show the restored edits in the film strip
                     if (result.Count > 0) doc.Unload();
                     result.Add(doc);
                 }

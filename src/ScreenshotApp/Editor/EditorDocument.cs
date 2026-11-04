@@ -68,7 +68,26 @@ internal sealed class EditorDocument : INotifyPropertyChanged
     /// <summary>True when the shot was edited after it was last saved.</summary>
     public bool Dirty { get; set; }
 
-    public ImageSource Thumbnail { get; }
+    private ImageSource _thumbnail;
+
+    /// <summary>Film-strip preview of the output (annotations and crop included); see <see cref="RefreshThumbnail"/>.</summary>
+    public ImageSource Thumbnail
+    {
+        get => _thumbnail;
+        private set
+        {
+            _thumbnail = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Thumbnail)));
+        }
+    }
+
+    /// <summary>Re-renders the thumbnail from the flattened output. UI thread; no-op while the pixels are unloaded.</summary>
+    public void RefreshThumbnail()
+    {
+        if (_pixels is not { } img) return;
+        var flat = Annotations.Count == 0 && Crop.Rect is null ? img : ImageExporter.Render(img, Annotations, Crop.Rect);
+        Thumbnail = MakeThumbnail(flat);
+    }
     public List<Annotation> Annotations { get; } = new();
     public CommandStack Commands { get; } = new();
 
@@ -92,7 +111,7 @@ internal sealed class EditorDocument : INotifyPropertyChanged
         Height = image.Height;
         _pixels = image;
         _png = png;
-        Thumbnail = MakeThumbnail(image);
+        _thumbnail = MakeThumbnail(image);
 
         if (png is null)
         {
