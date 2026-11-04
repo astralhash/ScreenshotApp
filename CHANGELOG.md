@@ -1,8 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.2.5
 
 - Editor: closed clips go to a bin on the right edge of the film strip instead of being deleted. Click the bin to put a clip back where it was (or *Restore all*). The bin keeps the 20 most recently closed clips for 24 hours each, and is emptied when you exit ScreenshotApp; *Empty bin* clears it sooner. *Remove all clips* also goes to the bin.
+- Editor: film-strip thumbnails now show your annotations and crop, and update shortly after each edit, undo or redo. Clips restored at startup show their edits too.
 
 ## 0.2.4
 
