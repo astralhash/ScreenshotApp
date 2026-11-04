@@ -279,6 +279,14 @@ internal sealed partial class EditorViewModel : ObservableObject
         {
             OnPropertyChanged(nameof(HasShots));
             OnPropertyChanged(nameof(IsEmpty));
+            OnPropertyChanged(nameof(ShowFilmStrip));
+        };
+        Bin.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(HasBin));
+            OnPropertyChanged(nameof(BinCount));
+            OnPropertyChanged(nameof(BinToolTip));
+            OnPropertyChanged(nameof(ShowFilmStrip));
         };
 
         _widthSaveTimer = DispatcherQueue.GetForCurrentThread().CreateTimer();
@@ -317,14 +325,14 @@ internal sealed partial class EditorViewModel : ObservableObject
         SelectedShot = Shots.FirstOrDefault();
     }
 
-    /// <summary>Closes a clip: it leaves the film strip and is deleted from the store.</summary>
+    /// <summary>Closes a clip: it leaves the film strip for the recycle bin (kept until the app exits).</summary>
     public void RemoveShot(EditorDocument doc)
     {
         int index = Shots.IndexOf(doc);
         if (index < 0) return;
         bool wasSelected = doc == SelectedShot;
         Shots.Remove(doc);
-        _store.Remove(doc);
+        MoveToBin(doc, index);
 
         if (Shots.Count == 0)
         {
@@ -336,6 +344,7 @@ internal sealed partial class EditorViewModel : ObservableObject
             // Removing the selected item makes the ListView clear its selection; pick the neighbour.
             SelectedShot = Shots[Math.Min(index, Shots.Count - 1)];
         }
+        doc.Unload(); // no longer shown: only the compressed copy waits in the bin
     }
 
     public void ShowStatus(string text)
@@ -429,13 +438,108 @@ internal sealed partial class EditorViewModel : ObservableObject
         if (shot != SelectedShot) shot.Unload();
     }
 
-    /// <summary>Closes every clip (deleting them from the store); the editor stays open, empty.</summary>
+    /// <summary>Closes every clip (into the recycle bin); the editor stays open, empty.</summary>
     public void RemoveAllShots()
     {
-        foreach (var doc in Shots.ToList()) _store.Remove(doc);
+        var all = Shots.ToList();
         Shots.Clear();
         SelectedShot = null; // the editor stays open and shows its start page
+        // Last one first, so the bin lists them in film-strip order and restores them in place.
+        for (int i = all.Count - 1; i >= 0; i--)
+        {
+            MoveToBin(all[i], i);
+            all[i].Unload();
+        }
         LastShotClosed?.Invoke(this, EventArgs.Empty);
+    }
+
+    // ---- recycle bin: closed clips stay recoverable for a while ----
+
+    /// <summary>The bin keeps at most this many clips; closing another deletes the oldest for good.</summary>
+    public const int BinCapacity = 20;
+
+    /// <summary>A clip is deleted for good once it has been in the bin this long.</summary>
+    public static readonly TimeSpan BinLifetime = TimeSpan.FromHours(24);
+
+    /// <summary>Closed clips, most recently closed first. Not persisted: emptied at exit.</summary>
+    public ObservableCollection<EditorDocument> Bin { get; } = new();
+
+    /// <summary>Film-strip position each binned clip had (so a restore puts it back there) and when it was closed.</summary>
+    private readonly Dictionary<EditorDocument, (int Index, DateTime ClosedUtc)> _binInfo = new();
+
+    private DispatcherQueueTimer? _binExpiryTimer;
+
+    public bool HasBin => Bin.Count > 0;
+    public int BinCount => Bin.Count;
+    public string BinToolTip => Bin.Count == 1 ? "1 closed clip" : $"{Bin.Count} closed clips";
+
+    /// <summary>The film strip stays up while the bin has something to restore, even with no clips open.</summary>
+    public bool ShowFilmStrip => HasShots || HasBin;
+
+    private void MoveToBin(EditorDocument doc, int index)
+    {
+        _store.Remove(doc);
+        _binInfo[doc] = (index, DateTime.UtcNow);
+        Bin.Insert(0, doc);
+
+        // Over capacity: the oldest closed clips (at the end) go for good.
+        if (Bin.Count > BinCapacity) PurgeFromBin(Bin.Skip(BinCapacity).ToList());
+
+        if (_binExpiryTimer is null)
+        {
+            _binExpiryTimer = DispatcherQueue.GetForCurrentThread().CreateTimer();
+            _binExpiryTimer.Interval = TimeSpan.FromMinutes(1);
+            _binExpiryTimer.Tick += (_, _) => PurgeExpired();
+        }
+        if (!_binExpiryTimer.IsRunning) _binExpiryTimer.Start();
+    }
+
+    /// <summary>Deletes clips that have been in the bin longer than <see cref="BinLifetime"/>.</summary>
+    private void PurgeExpired()
+    {
+        var cutoff = DateTime.UtcNow - BinLifetime;
+        var expired = Bin.Where(d => _binInfo[d].ClosedUtc <= cutoff).ToList();
+        if (expired.Count > 0) PurgeFromBin(expired);
+        if (Bin.Count == 0) _binExpiryTimer?.Stop();
+    }
+
+    private void PurgeFromBin(List<EditorDocument> docs)
+    {
+        _store.Purge(docs);
+        foreach (var doc in docs)
+        {
+            Bin.Remove(doc);
+            _binInfo.Remove(doc);
+        }
+    }
+
+    /// <summary>Puts a closed clip back where it was in the film strip and opens it.</summary>
+    public void RestoreShot(EditorDocument doc) => RestoreShot(doc, select: true);
+
+    private void RestoreShot(EditorDocument doc, bool select)
+    {
+        if (!Bin.Remove(doc)) return;
+        int index = _binInfo.Remove(doc, out var info) ? Math.Min(info.Index, Shots.Count) : 0;
+        Shots.Insert(index, doc);
+        _store.Restore(doc);
+        if (select) SelectedShot = doc;
+    }
+
+    public void RestoreAllShots()
+    {
+        // Most recently closed first: the exact reverse of the closes, so every clip lands where it was.
+        var docs = Bin.ToList();
+        foreach (var doc in docs) RestoreShot(doc, select: false);
+        SelectedShot ??= Shots.FirstOrDefault(); // keep the open clip if there is one
+    }
+
+    /// <summary>Deletes the binned clips for good.</summary>
+    public void EmptyBin()
+    {
+        _store.Purge(Bin);
+        Bin.Clear();
+        _binInfo.Clear();
+        _binExpiryTimer?.Stop();
     }
 
     /// <summary>Raised after the film strip becomes empty because clips were closed.</summary>

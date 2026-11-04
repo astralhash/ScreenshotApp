@@ -29,6 +29,7 @@ internal sealed class ClipStore
     private readonly string _dir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ScreenshotApp", "clips");
     private readonly List<Task> _pendingImageWrites = new();
+    private readonly HashSet<Guid> _binned = new();
     private readonly DispatcherQueueTimer _saveTimer;
     private Func<IReadOnlyList<EditorDocument>>? _getShots;
 
@@ -117,10 +118,31 @@ internal sealed class ClipStore
         ScheduleSave();
     }
 
+    /// <summary>
+    /// A clip went to the recycle bin: it leaves the index but its image stays on disk until
+    /// <see cref="Restore"/> or exit. After a crash, LoadAsync deletes the unreferenced image anyway.
+    /// </summary>
     public void Remove(EditorDocument doc)
     {
-        TryDelete(ImagePath(doc.Id));
+        lock (_binned) _binned.Add(doc.Id);
         ScheduleSave();
+    }
+
+    /// <summary>A binned clip went back to the film strip.</summary>
+    public void Restore(EditorDocument doc)
+    {
+        lock (_binned) _binned.Remove(doc.Id);
+        ScheduleSave();
+    }
+
+    /// <summary>Deletes binned clips' images for good (Empty bin, and at exit).</summary>
+    public void Purge(IEnumerable<EditorDocument> docs)
+    {
+        foreach (var doc in docs)
+        {
+            lock (_binned) _binned.Remove(doc.Id);
+            TryDelete(ImagePath(doc.Id));
+        }
     }
 
     public void ScheduleSave()
@@ -137,6 +159,11 @@ internal sealed class ClipStore
         lock (_pendingImageWrites) pending = _pendingImageWrites.ToArray();
         try { Task.WaitAll(pending, TimeSpan.FromSeconds(5)); } catch (AggregateException) { }
         SaveIndex();
+
+        // The recycle bin only lasts for the session: its clips are gone once the app exits.
+        Guid[] binned;
+        lock (_binned) binned = _binned.ToArray();
+        foreach (var id in binned) TryDelete(ImagePath(id));
     }
 
     private void SaveIndex()

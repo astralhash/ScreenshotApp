@@ -249,9 +249,14 @@
                      PreviewKeyDown="TextEditor_PreviewKeyDown" LostFocus="TextEditor_LostFocus" />
         </local:CursorGrid>
 
-        <!-- Film strip: newest shot on the left -->
-        <Border Grid.Row="5" Visibility="{x:Bind ViewModel.HasShots, Mode=OneWay}" Background="{ThemeResource LayerFillColorDefaultBrush}"
+        <!-- Film strip: newest shot on the left; the recycle bin sits on its right edge -->
+        <Border Grid.Row="5" Visibility="{x:Bind ViewModel.ShowFilmStrip, Mode=OneWay}" Background="{ThemeResource LayerFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+          <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
             <ListView x:Name="FilmStrip" Height="122" Padding="8,6" SelectionMode="Single"
                       ItemsSource="{x:Bind ViewModel.Shots}" SelectedItem="{x:Bind ViewModel.SelectedShot, Mode=TwoWay}"
                       AllowFocusOnInteraction="False"
@@ -294,10 +299,73 @@
                     </DataTemplate>
                 </ListView.ItemTemplate>
             </ListView>
+
+            <!-- Recycle bin: closed clips, recoverable until the app exits -->
+            <Border Grid.Column="1" Visibility="{x:Bind ViewModel.HasBin, Mode=OneWay}" Padding="8,0,10,0"
+                    BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="1,0,0,0">
+                <Button x:Name="BinButton" Style="{StaticResource ToolButton}" Width="44" Height="44" Padding="0"
+                        VerticalAlignment="Center"
+                        ToolTipService.ToolTip="{x:Bind ViewModel.BinToolTip, Mode=OneWay}">
+                    <Grid>
+                        <FontIcon Glyph="&#xE74D;" Style="{StaticResource ToolIcon}" FontSize="18" />
+                        <InfoBadge Value="{x:Bind ViewModel.BinCount, Mode=OneWay}"
+                                   HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-8,-12,0"
+                                   Background="{ThemeResource ControlStrongFillColorDefaultBrush}" />
+                    </Grid>
+                    <Button.Flyout>
+                        <Flyout x:Name="BinFlyout" Placement="TopEdgeAlignedRight" ShouldConstrainToRootBounds="False"
+                                Opening="BinFlyout_Opening">
+                            <!-- Room for all 20 (BinCapacity) as a 5 x 4 grid at film-strip size; the default presenter caps width at 456 -->
+                            <Flyout.FlyoutPresenterStyle>
+                                <Style TargetType="FlyoutPresenter" BasedOn="{StaticResource DefaultFlyoutPresenterStyle}">
+                                    <Setter Property="MaxWidth" Value="10000" />
+                                    <Setter Property="MaxHeight" Value="10000" />
+                                </Style>
+                            </Flyout.FlyoutPresenterStyle>
+                            <StackPanel x:Name="BinPanel" Width="840" Spacing="10">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Closed clips" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                    <TextBlock Text="Click a clip to put it back. The last 20 are kept for 24 hours, or until you exit ScreenshotApp."
+                                               TextWrapping="Wrap" Style="{StaticResource CaptionTextBlockStyle}"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                                <GridView ItemsSource="{x:Bind ViewModel.Bin}" SelectionMode="None" IsItemClickEnabled="True"
+                                          ItemClick="BinItem_Click"
+                                          ScrollViewer.VerticalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollMode="Disabled">
+                                    <GridView.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <ItemsWrapGrid Orientation="Horizontal" MaximumRowsOrColumns="5" />
+                                        </ItemsPanelTemplate>
+                                    </GridView.ItemsPanel>
+                                    <GridView.ItemContainerStyle>
+                                        <Style TargetType="GridViewItem" BasedOn="{StaticResource DefaultGridViewItemStyle}">
+                                            <Setter Property="Margin" Value="0,0,6,6" />
+                                            <Setter Property="Padding" Value="0" />
+                                        </Style>
+                                    </GridView.ItemContainerStyle>
+                                    <GridView.ItemTemplate>
+                                        <!-- Same size as a film-strip thumbnail -->
+                                        <DataTemplate x:DataType="local:EditorDocument">
+                                            <Border Width="160" Height="90" CornerRadius="4">
+                                                <Image Source="{x:Bind Thumbnail}" Stretch="Uniform" />
+                                            </Border>
+                                        </DataTemplate>
+                                    </GridView.ItemTemplate>
+                                </GridView>
+                                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                                    <Button Content="Empty bin" Click="EmptyBin_Click" />
+                                    <Button Content="Restore all" Click="RestoreAll_Click" Style="{StaticResource AccentButtonStyle}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
+            </Border>
+          </Grid>
         </Border>
 
         <!-- Start page: shown while there are no clips -->
-        <StackPanel Grid.Row="1" Grid.RowSpan="5" HorizontalAlignment="Center" VerticalAlignment="Center"
+        <StackPanel Grid.Row="1" Grid.RowSpan="4" HorizontalAlignment="Center" VerticalAlignment="Center"
                     Spacing="18" MaxWidth="560" Padding="24"
                     Visibility="{x:Bind ViewModel.IsEmpty, Mode=OneWay}">
             <FontIcon Glyph="&#xE91B;" FontFamily="Segoe Fluent Icons" FontSize="48" HorizontalAlignment="Center"

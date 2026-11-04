@@ -539,7 +539,8 @@ public sealed partial class EditorWindow : Window
                         new TextBlock
                         {
                             Text = $"This closes all {ViewModel.Shots.Count} clips in the film strip. " +
-                                   "Clips that are not saved, and their edits, will be lost.",
+                                   "The bin keeps the last 20 for 24 hours, or until you exit ScreenshotApp; " +
+                                   "after that, clips that are not saved, and their edits, are gone.",
                             TextWrapping = TextWrapping.Wrap,
                         },
                         dontAsk,
@@ -559,6 +560,40 @@ public sealed partial class EditorWindow : Window
             }
         }
         ViewModel.RemoveAllShots();
+    }
+
+    // ---- recycle bin ----
+
+    private void BinFlyout_Opening(object? sender, object e) => SizeBinPanel();
+
+    /// <summary>
+    /// The panel is as wide as the thumbnails need: one per clip up to the full row of 5
+    /// (160 px thumbnail + 6 px gap each), but never too narrow for the text and buttons.
+    /// </summary>
+    private void SizeBinPanel()
+    {
+        const int columns = 5, cell = 166, minWidth = 360;
+        int used = Math.Clamp(ViewModel.BinCount, 1, columns);
+        BinPanel.Width = Math.Max(used * cell + 10, minWidth);
+    }
+
+    private void BinItem_Click(object sender, ItemClickEventArgs e)
+    {
+        if (e.ClickedItem is EditorDocument doc) ViewModel.RestoreShot(doc);
+        if (!ViewModel.HasBin) BinFlyout.Hide();
+        else SizeBinPanel();
+    }
+
+    private void RestoreAll_Click(object sender, RoutedEventArgs e)
+    {
+        BinFlyout.Hide();
+        ViewModel.RestoreAllShots();
+    }
+
+    private void EmptyBin_Click(object sender, RoutedEventArgs e)
+    {
+        BinFlyout.Hide();
+        ViewModel.EmptyBin();
     }
 
     private EditorDocument? _hoveredClip;

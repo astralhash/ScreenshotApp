@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Editor: closed clips go to a bin on the right edge of the film strip instead of being deleted. Click the bin to put a clip back where it was (or *Restore all*). The bin keeps the 20 most recently closed clips for 24 hours each, and is emptied when you exit ScreenshotApp; *Empty bin* clears it sooner. *Remove all clips* also goes to the bin.
+
 ## 0.2.4
 
 - Share Region has a frame rate limit (Settings → *Share region*, default 30 fps, 0 = unlimited). It applies right away, even during a share. At 30 fps it uses roughly 40% less CPU and 30% less GPU than unlimited, and meeting apps rarely send more than 30 fps anyway.
