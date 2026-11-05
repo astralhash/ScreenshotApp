@@ -100,6 +100,8 @@ public sealed partial class SettingsWindow : Window
     private static bool IsDown(VirtualKey key) =>
         InputKeyboardSource.GetKeyStateForCurrentThread(key).HasFlag(CoreVirtualKeyStates.Down);
 
+    private async void CheckUpdates_Click(object sender, RoutedEventArgs e) => await ViewModel.CheckForUpdatesNowAsync();
+
     private async void Browse_Click(object sender, RoutedEventArgs e)
     {
         var picker = new FolderPicker { SuggestedStartLocation = PickerLocationId.PicturesLibrary };

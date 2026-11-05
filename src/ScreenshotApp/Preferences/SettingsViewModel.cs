@@ -50,6 +50,16 @@ internal sealed partial class SettingsViewModel : ObservableObject
     /// <summary>Share Region frame limit; 0 = unlimited. A double for NumberBox.</summary>
     [ObservableProperty] public partial double ShareRegionFps { get; set; }
 
+    [ObservableProperty] public partial bool CheckForUpdates { get; set; }
+
+    /// <summary>"Last checked …", or the result of "Check now".</summary>
+    [ObservableProperty] public partial string UpdateStatus { get; set; } = "";
+
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanCheckForUpdates))]
+    public partial bool CheckingForUpdates { get; set; }
+
+    public bool CanCheckForUpdates => !CheckingForUpdates;
+
     public IReadOnlyList<HotkeyRow> Hotkeys { get; } = HotkeyActions.All.Select(a => new HotkeyRow(a)).ToList();
 
     [ObservableProperty] public partial string HotkeyMessage { get; set; } = "";
@@ -80,7 +90,21 @@ internal sealed partial class SettingsViewModel : ObservableObject
         CaptureCursor = s.CaptureCursor;
         OverlayStyleIndex = s.DimOverlay ? 0 : 1;
         ShareRegionFps = s.ShareRegionFps;
+        CheckForUpdates = s.CheckForUpdates;
+        UpdateStatus = LastCheckedText();
         _loading = false;
+    }
+
+    private string LastCheckedText() => _service.Current.LastUpdateCheck is { } last
+        ? "Last checked " + last.ToLocalTime().ToString("g")
+        : "Not checked yet";
+
+    public async Task CheckForUpdatesNowAsync()
+    {
+        CheckingForUpdates = true;
+        UpdateStatus = "Checking…";
+        try { UpdateStatus = await App.CheckForUpdatesNowAsync(); }
+        finally { CheckingForUpdates = false; }
     }
 
     private void LoadHotkeys()
@@ -205,6 +229,14 @@ internal sealed partial class SettingsViewModel : ObservableObject
     partial void OnCaptureCursorChanged(bool value) => Changed();
     partial void OnOverlayStyleIndexChanged(int value) => Changed();
     partial void OnShareRegionFpsChanged(double value) => Changed();
+    partial void OnCheckForUpdatesChanged(bool value)
+    {
+        if (_loading) return;
+        _service.Current.CheckForUpdates = value;
+        try { _service.Save(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Log.Error(ex); }
+        if (value) App.UpdateCheckSettingChanged();
+    }
     private void Changed()
     {
         OnPropertyChanged(nameof(NoTargets));

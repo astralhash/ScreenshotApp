@@ -16,6 +16,7 @@ internal enum TrayCommand
     Exit,
     ShareRegion,
     StopSharing,
+    Update,
 }
 
 /// <summary>Notification-area icon with a context menu and balloon notifications.</summary>
@@ -24,13 +25,22 @@ internal sealed unsafe class TrayService : IDisposable
     private const uint CallbackMessage = PInvoke.WM_USER + 1;
     private const uint IconId = 1;
 
+    // Balloon notifications arrive in the callback's lParam (pre-NOTIFYICON_VERSION_4 style).
+    private const uint NIN_BALLOONHIDE = PInvoke.WM_USER + 3;
+    private const uint NIN_BALLOONTIMEOUT = PInvoke.WM_USER + 4;
+    private const uint NIN_BALLOONUSERCLICK = PInvoke.WM_USER + 5;
+
     private readonly MessageWindow _window;
     private readonly Action<TrayCommand> _onCommand;
     private HICON _icon;
     private bool _added;
+    private Action? _balloonClick;
 
     /// <summary>A region is being shared: the menu offers to stop it instead of starting one.</summary>
     public bool Sharing { get; set; }
+
+    /// <summary>A newer version that can be installed ("0.2.6"): the menu shows "Update to 0.2.6…". Null for none.</summary>
+    public string? UpdateVersion { get; set; }
 
     public TrayService(MessageWindow window, Action<TrayCommand> onCommand)
     {
@@ -46,9 +56,11 @@ internal sealed unsafe class TrayService : IDisposable
         _added = PInvoke.Shell_NotifyIcon(NOTIFY_ICON_MESSAGE.NIM_ADD, data);
     }
 
-    public void ShowBalloon(string title, string message)
+    /// <summary>Shows a notification; <paramref name="onClick"/> runs if the user clicks it.</summary>
+    public void ShowBalloon(string title, string message, Action? onClick = null)
     {
         if (!_added) return;
+        _balloonClick = onClick;
         var data = NewData(NOTIFY_ICON_DATA_FLAGS.NIF_INFO);
         data.szInfoTitle = title;
         data.szInfo = message;
@@ -70,7 +82,15 @@ internal sealed unsafe class TrayService : IDisposable
         handled = true;
 
         uint mouseMsg = (uint)(lParam.Value & 0xFFFF);
-        if (mouseMsg == PInvoke.WM_RBUTTONUP || mouseMsg == PInvoke.WM_CONTEXTMENU)
+        if (mouseMsg == NIN_BALLOONUSERCLICK)
+        {
+            var click = _balloonClick;
+            _balloonClick = null;
+            click?.Invoke();
+        }
+        else if (mouseMsg is NIN_BALLOONTIMEOUT or NIN_BALLOONHIDE)
+            _balloonClick = null;
+        else if (mouseMsg == PInvoke.WM_RBUTTONUP || mouseMsg == PInvoke.WM_CONTEXTMENU)
             ShowMenu();
         else if (mouseMsg == PInvoke.WM_LBUTTONUP)
             _onCommand(TrayCommand.OpenEditor);
@@ -97,6 +117,7 @@ internal sealed unsafe class TrayService : IDisposable
                 Append(menu, TrayCommand.ShareRegion, "Set Sharing Region", HotkeyAction.ShareRegion);
             }
             PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (string?)null);
+            if (UpdateVersion is { } update) Append(menu, TrayCommand.Update, $"Update to {update}…");
             Append(menu, TrayCommand.Settings, "Settings");
             PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (string?)null);
             Append(menu, TrayCommand.Exit, "Exit");

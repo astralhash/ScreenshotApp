@@ -167,6 +167,23 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Updates: nothing goes online unless switched on (or Check now is clicked) -->
+                <TextBlock Text="Updates" Style="{StaticResource SectionHeader}" />
+                <Border Style="{StaticResource Card}">
+                    <StackPanel Spacing="10">
+                        <ToggleSwitch Header="Check for updates automatically" OnContent="On" OffContent="Off"
+                                      IsOn="{x:Bind ViewModel.CheckForUpdates, Mode=TwoWay}" />
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="Once a day ScreenshotApp asks github.com whether there is a new release, and shows what's new before anything is installed. Nothing else is sent." />
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Button Content="Check now" Click="CheckUpdates_Click"
+                                    IsEnabled="{x:Bind ViewModel.CanCheckForUpdates, Mode=OneWay}" />
+                            <TextBlock VerticalAlignment="Center" Style="{StaticResource Hint}"
+                                       Text="{x:Bind ViewModel.UpdateStatus, Mode=OneWay}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
                 <!-- About -->
                 <TextBlock Text="About" Style="{StaticResource SectionHeader}" />
                 <Border Style="{StaticResource Card}">

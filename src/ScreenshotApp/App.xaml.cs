@@ -1,9 +1,11 @@
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using ScreenshotApp.Capture;
 using ScreenshotApp.Editor;
 using ScreenshotApp.Preferences;
 using ScreenshotApp.Services;
 using ScreenshotApp.Sharing;
+using ScreenshotApp.Updates;
 
 namespace ScreenshotApp;
 
@@ -18,6 +20,10 @@ public partial class App : Application
     private EditorWindow? _editor;
     private SettingsWindow? _settingsWindow;
     private RegionShare? _share;
+    private UpdateOffer? _update;
+    private UpdateWindow? _updateWindow;
+    private DispatcherQueueTimer? _updateTimer;
+    private bool _checkingForUpdates;
 
     internal static SettingsService Settings => ((App)Current)._settings;
 
@@ -77,6 +83,11 @@ public partial class App : Application
         var switches = Environment.GetCommandLineArgs();
         if (switches.Contains("--open-editor", StringComparer.OrdinalIgnoreCase)) OpenEditor();
         if (switches.Contains("--open-settings", StringComparer.OrdinalIgnoreCase)) OpenSettings();
+
+        // Started by ScreenshotApp.Updater.exe after it installed a new version.
+        if (switches.Contains("--updated", StringComparer.OrdinalIgnoreCase))
+            _tray.ShowBalloon("ScreenshotApp updated", $"You are now running version {UpdateService.CurrentVersionText}.");
+        StartUpdateTimer();
 #if DEBUG
         // Developer shortcut: --share-region=X,Y,W,H starts sharing that rectangle without the overlay.
         if (switches.FirstOrDefault(s => s.StartsWith("--share-region=", StringComparison.OrdinalIgnoreCase)) is { } share
@@ -138,6 +149,7 @@ public partial class App : Application
             case TrayCommand.Settings: OpenSettings(); break;
             case TrayCommand.ShareRegion: ShareRegion(); break;
             case TrayCommand.StopSharing: StopSharing(); break;
+            case TrayCommand.Update: OpenUpdateWindow(); break;
             case TrayCommand.Exit: Shutdown(); break;
         }
     }
@@ -404,8 +416,159 @@ public partial class App : Application
         if (_editor is not null) _editor.AvoidArea = null;
     }
 
+    // ---------------------------------------------------------------- updates
+
+    /// <summary>
+    /// Fires 30 s after startup (when the updater of a previous update has exited, so its temp folder can go) and then
+    /// hourly; checks GitHub only when <c>CheckForUpdates</c> is on and the last check is a day old.
+    /// </summary>
+    private void StartUpdateTimer()
+    {
+        _updateTimer = DispatcherQueue.GetForCurrentThread().CreateTimer();
+        _updateTimer.Interval = TimeSpan.FromSeconds(30);
+        bool first = true;
+        _updateTimer.Tick += async (timer, _) =>
+        {
+            if (first)
+            {
+                first = false;
+                timer.Interval = TimeSpan.FromHours(1);
+                _ = Task.Run(UpdateService.CleanupLeftovers);
+            }
+            await AutoCheckForUpdatesAsync();
+        };
+        _updateTimer.Start();
+    }
+
+    /// <summary>The automatic check: silent unless it finds a version that was not skipped (then a balloon, once per version).</summary>
+    private async Task AutoCheckForUpdatesAsync()
+    {
+        var s = _settings.Current;
+        if (!s.CheckForUpdates || _checkingForUpdates) return;
+        if (s.LastUpdateCheck is { } last && DateTimeOffset.Now - last < TimeSpan.FromHours(24)) return;
+        try
+        {
+            var offer = await CheckForUpdatesAsync();
+            string? version = offer is null ? null : UpdateService.Format(offer.Latest.Version);
+            if (offer is null || version == s.SkippedUpdateVersion) return;
+            SetAvailableUpdate(offer);
+            if (s.UpdateNotifiedVersion != version)
+            {
+                _tray?.ShowBalloon("Update available",
+                    $"ScreenshotApp {version} is available. Click here to see what's new.", OpenUpdateWindow);
+                s.UpdateNotifiedVersion = version;
+                SaveSettings();
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Info("Update check failed: " + ex.Message); // offline etc.: try again on the next hourly tick
+        }
+    }
+
+    private async Task<UpdateOffer?> CheckForUpdatesAsync()
+    {
+        _checkingForUpdates = true;
+        try
+        {
+            var offer = await UpdateService.CheckAsync();
+            _settings.Current.LastUpdateCheck = DateTimeOffset.Now;
+            SaveSettings();
+            return offer;
+        }
+        finally
+        {
+            _checkingForUpdates = false;
+        }
+    }
+
+    /// <summary>"Check now" in Settings (works with the automatic check off). Opens the update window when there is one.</summary>
+    internal static async Task<string> CheckForUpdatesNowAsync()
+    {
+        var app = (App)Current;
+        try
+        {
+            var offer = await app.CheckForUpdatesAsync();
+            if (offer is null)
+            {
+                app.SetAvailableUpdate(null);
+                return $"You have the latest version ({UpdateService.CurrentVersionText}).";
+            }
+            app.SetAvailableUpdate(offer);
+            app.OpenUpdateWindow();
+            return $"Version {UpdateService.Format(offer.Latest.Version)} is available.";
+        }
+        catch (Exception ex)
+        {
+            Log.Info("Update check failed: " + ex.Message);
+            return "Could not check for updates: " + ex.Message;
+        }
+    }
+
+    /// <summary>The automatic check was switched on: check now (if the last check is more than a day old).</summary>
+    internal static void UpdateCheckSettingChanged() => _ = ((App)Current).AutoCheckForUpdatesAsync();
+
+    private void SetAvailableUpdate(UpdateOffer? offer)
+    {
+        _update = offer;
+        if (_tray is not null) _tray.UpdateVersion = offer is null ? null : UpdateService.Format(offer.Latest.Version);
+    }
+
+    private void OpenUpdateWindow()
+    {
+        if (_update is null) return;
+        if (_updateWindow is null)
+        {
+            var window = new UpdateWindow(_update)
+            {
+                IsSharing = () => _share is not null,
+                Install = InstallUpdate,
+            };
+            window.Skipped += version =>
+            {
+                _settings.Current.SkippedUpdateVersion = UpdateService.Format(version);
+                SaveSettings();
+                SetAvailableUpdate(null);
+            };
+            window.Closed += (_, _) => _updateWindow = null;
+            _updateWindow = window;
+        }
+        _updateWindow.Activate();
+    }
+
+    /// <summary>Starts the updater on the downloaded version, then exits (clips are flushed as on a normal exit).</summary>
+    private bool InstallUpdate(string stagedRoot, Version version)
+    {
+        try
+        {
+            UpdateService.LaunchInstaller(stagedRoot, version, openEditor: _editor?.IsShown == true);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex);
+            return false;
+        }
+        // Exit() called from inside the update window's click handler left the process running (seen in testing),
+        // so close that window first and shut down on the next dispatcher turn. The updater waits for this process
+        // to end, so as a last resort it is ended outright a few seconds later (clips are flushed by then).
+        _updateWindow?.Close();
+        DispatcherQueue.GetForCurrentThread().TryEnqueue(() =>
+        {
+            Shutdown();
+            _ = Task.Delay(TimeSpan.FromSeconds(5)).ContinueWith(_ => Environment.Exit(0), TaskScheduler.Default);
+        });
+        return true;
+    }
+
+    private void SaveSettings()
+    {
+        try { _settings.Save(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Log.Error(ex); }
+    }
+
     private void Shutdown()
     {
+        _updateTimer?.Stop();
         StopSharing();
         _clips?.Flush(); // persist unsaved clips and their edits
         _hotkeys?.Dispose();

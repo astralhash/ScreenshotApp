@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Updates: Settings → *Updates* can check GitHub for a new release once a day. This is off by default, and ScreenshotApp makes no internet connection unless you turn it on or click *Check now*. When there is a new version you get a notification and an *Update to …* item in the tray menu. The update window shows what changed in every release since yours, and *Update now* downloads the new version, checks it against GitHub's checksum, restarts ScreenshotApp and installs it. Your clips and settings are kept. *Skip this version* hides that release from the automatic check.
+- This is the first version with the updater, so it has to be installed by hand once. Later versions can update themselves.
+
 ## 0.2.5
 
 - Editor: closed clips go to a bin on the right edge of the film strip instead of being deleted. Click the bin to put a clip back where it was (or *Restore all*). The bin keeps the 20 most recently closed clips for 24 hours each, and is emptied when you exit ScreenshotApp; *Empty bin* clears it sooner. *Remove all clips* also goes to the bin.

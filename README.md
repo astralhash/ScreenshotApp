@@ -36,6 +36,15 @@ Built with C#, .NET 10 and WinUI 3 (Windows App SDK). It is unpackaged, so there
 - To end it, choose **Remove Sharing Region** in the tray menu, or press the hotkey again.
 - The mirror runs at up to 30 frames per second by default; change it in Settings → *Share region* (0 = unlimited).
 
+**Updates**
+- Optional and off by default: ScreenshotApp makes no internet connection unless you turn on
+  Settings → *Updates* → *Check for updates automatically* (once a day, it asks the GitHub API for the release list) or click *Check now*.
+- When a new version is out, a notification and a tray menu item open a window with the release notes of every version
+  since yours. *Update now* downloads the release zip to your temp folder, checks its size and SHA-256 against GitHub,
+  then restarts: a small helper (`ScreenshotApp.Updater.exe`) replaces the app's files in place, starts the new version, and
+  puts the old one back if anything fails. Other files you keep in that folder are left alone.
+- If the app's folder is not writable (for example under Program Files), the window links to the download page instead.
+
 ## Hotkeys
 
 | Default | Action |
@@ -95,10 +104,14 @@ To check that the code compiles without stopping a running copy, build to anothe
 ### Portable build
 
 ```powershell
-dotnet publish src/ScreenshotApp -c Release -r win-x64 -p:Platform=x64 --self-contained true -o publish
+./build/publish.ps1
 ```
 
-This is how the release zip is made. Copy the whole output folder anywhere (about 225 MB unzipped) and run `ScreenshotApp.exe`; keep the folder together.
+This is how the release zip is made: it publishes the app self-contained, adds `ScreenshotApp.Updater.exe` (NativeAOT, needs
+the Visual Studio C++ build tools) and a file list for the updater, zips it to
+`artifacts\ScreenshotApp-<version>-win-x64.zip`, and extracts this version's CHANGELOG section for the release notes.
+Tag releases `v<version>` and keep the asset name, or the in-app updater will not find them.
+Copy the whole output folder anywhere (about 225 MB unzipped) and run `ScreenshotApp.exe`; keep the folder together.
 Settings and clips live in `%AppData%\ScreenshotApp`, not next to the exe.
 
 ## Settings
@@ -116,6 +129,9 @@ src/ScreenshotApp/
   Editor/Model/  UI-independent annotation classes and the undo/redo command stack
   Preferences/   settings window and view model
   Services/      hidden message window, tray icon, hotkeys, settings, clipboard, image save/load, startup entry
+  Updates/       GitHub release check, download and checksum, update window
+src/ScreenshotApp.Updater/   the helper exe that swaps the files and restarts the app
+build/publish.ps1            makes the release zip
 ```
 
 All Win32 interop goes through [CsWin32](https://github.com/microsoft/CsWin32), the editor canvas and export through

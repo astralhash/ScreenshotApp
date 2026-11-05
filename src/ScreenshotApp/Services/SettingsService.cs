@@ -42,6 +42,18 @@ internal sealed class AppSettings
     /// <summary>Most frames per second the Share Region mirror shows; 0 = every captured frame (up to the refresh rate).</summary>
     public int ShareRegionFps { get; set; } = 30;
 
+    /// <summary>Look for new releases on GitHub once a day. Off by default: no network use unless the user opts in.</summary>
+    public bool CheckForUpdates { get; set; }
+
+    /// <summary>When the last update check (automatic or "Check now") succeeded.</summary>
+    public DateTimeOffset? LastUpdateCheck { get; set; }
+
+    /// <summary>"Skip this version": automatic checks do not offer this version (a manual check still does).</summary>
+    public string? SkippedUpdateVersion { get; set; }
+
+    /// <summary>The version the "update available" balloon was last shown for, so it appears once per version.</summary>
+    public string? UpdateNotifiedVersion { get; set; }
+
     /// <summary>Whether the region-capture zoom lens (Z) was on; remembered from capture to capture.</summary>
     public bool ZoomLensEnabled { get; set; }
 
