@@ -1,0 +1,66 @@
+# Builds the portable release zip from a version tag and attaches it to a DRAFT GitHub release.
+# The in-app updater ignores drafts, so nobody is offered the version until the draft is published by hand.
+#
+#   1. Set <Version> in src/ScreenshotApp/ScreenshotApp.csproj and add a "## <version>" section to CHANGELOG.md
+#   2. Commit, then: git tag v<version>; git push origin main v<version>
+#   3. Check the draft on GitHub (notes, zip) and publish it
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write      # create the release
+  id-token: write      # build provenance attestation
+  attestations: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Check tag, project version and changelog agree
+        shell: pwsh
+        run: |
+          $tag = '${{ github.ref_name }}'
+          $version = $tag.TrimStart('v')
+          $project = ([xml](Get-Content src/ScreenshotApp/ScreenshotApp.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          if ($project -ne $version) { throw "Tag $tag does not match <Version>$project</Version> in ScreenshotApp.csproj" }
+          if (-not (Select-String -Path CHANGELOG.md -Pattern "^## $([regex]::Escape($version))\s*$" -Quiet)) {
+            throw "CHANGELOG.md has no '## $version' section"
+          }
+          "VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Build release zip
+        shell: pwsh
+        run: ./build/publish.ps1 -Runtime win-x64
+
+      - name: Check the package
+        shell: pwsh
+        run: |
+          $app = "artifacts/ScreenshotApp-$env:VERSION-win-x64"
+          foreach ($f in 'ScreenshotApp.exe', 'ScreenshotApp.Updater.exe', 'ScreenshotApp.files') {
+            if (-not (Test-Path "$app/$f")) { throw "$f is missing from the package" }
+          }
+          $product = (Get-Item "$app/ScreenshotApp.exe").VersionInfo.ProductVersion
+          if (-not $product.StartsWith($env:VERSION)) { throw "ScreenshotApp.exe is version $product" }
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: artifacts/ScreenshotApp-${{ env.VERSION }}-win-x64.zip
+
+      - name: Create draft release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create '${{ github.ref_name }}' "artifacts/ScreenshotApp-$env:VERSION-win-x64.zip" `
+            --draft --title '${{ github.ref_name }}' `
+            --notes-file "artifacts/release-notes-$env:VERSION.md" --generate-notes

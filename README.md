@@ -111,6 +111,11 @@ This is how the release zip is made: it publishes the app self-contained, adds `
 the Visual Studio C++ build tools) and a file list for the updater, zips it to
 `artifacts\ScreenshotApp-<version>-win-x64.zip`, and extracts this version's CHANGELOG section for the release notes.
 Tag releases `v<version>` and keep the asset name, or the in-app updater will not find them.
+
+Releases are built by GitHub Actions (`.github/workflows/release.yml`): set `<Version>` in the csproj, add a
+`## <version>` section to CHANGELOG.md, commit, then `git tag v<version>` and `git push origin main v<version>`. The workflow
+checks that tag, version and changelog agree, runs `publish.ps1`, attests the zip's build provenance and creates a
+**draft** release. The in-app updater ignores drafts, so check the draft on GitHub and publish it.
 Copy the whole output folder anywhere (about 225 MB unzipped) and run `ScreenshotApp.exe`; keep the folder together.
 Settings and clips live in `%AppData%\ScreenshotApp`, not next to the exe.
 
