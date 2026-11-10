@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1
+
+- Editor: moving or resizing a shape is smoother, most of all on large captures. Only the shape you drag is redrawn while you drag it, instead of the whole image.
+- Editor: film-strip thumbnails update with less work after each edit, and hovering over text labels is lighter.
+- Capturing: the selection overlay comes up faster after the hotkey, and window captures finish faster.
+- Copying to the clipboard uses less memory. Saving or copying a clip you have not edited, and the *File* capture target with PNG, no longer compress the image a second time.
+
 ## 0.3.0
 
 - Updates: Settings → *Updates* can check GitHub for a new release once a day. This is off by default, and ScreenshotApp makes no internet connection unless you turn it on or click *Check now*. When there is a new version you get a notification and an *Update to …* item in the tray menu. The update window shows what changed in every release since yours, and *Update now* downloads the new version, checks it against GitHub's checksum, restarts ScreenshotApp and installs it. Your clips and settings are kept. *Skip this version* hides that release from the automatic check.
