@@ -94,9 +94,14 @@ internal sealed unsafe class OverlayWindow : IDisposable
 
             _brightBmp = ScreenCapture.CreateDib(_bounds.Width, _bounds.Height, out var bright);
             _brightBits = bright;
-            _dimBmp = ScreenCapture.CreateDib(_bounds.Width, _bounds.Height, out var dim);
             PInvoke.SelectObject(_brightDc, _brightBmp);
-            PInvoke.SelectObject(_dimDc, _dimBmp);
+            // The dimmed copy is only painted when the overlay dims (not with "crosshair only" or during a share).
+            void* dim = null;
+            if (_owner.Dim)
+            {
+                _dimBmp = ScreenCapture.CreateDib(_bounds.Width, _bounds.Height, out dim);
+                PInvoke.SelectObject(_dimDc, _dimBmp);
+            }
 
             int srcX = _bounds.X - frozen.ScreenX, srcY = _bounds.Y - frozen.ScreenY;
             int rowBytes = _bounds.Width * 4;
@@ -105,16 +110,8 @@ internal sealed unsafe class OverlayWindow : IDisposable
                 for (int y = 0; y < _bounds.Height; y++)
                 {
                     byte* s = src + ((long)(srcY + y) * frozen.Width + srcX) * 4;
-                    byte* b = (byte*)bright + (long)y * rowBytes;
-                    byte* d = (byte*)dim + (long)y * rowBytes;
-                    Buffer.MemoryCopy(s, b, rowBytes, rowBytes);
-                    for (int x = 0; x < rowBytes; x += 4)
-                    {
-                        d[x] = (byte)(s[x] * 100 >> 8);         // ~39% brightness
-                        d[x + 1] = (byte)(s[x + 1] * 100 >> 8);
-                        d[x + 2] = (byte)(s[x + 2] * 100 >> 8);
-                        d[x + 3] = 0xFF;
-                    }
+                    Buffer.MemoryCopy(s, (byte*)bright + (long)y * rowBytes, rowBytes, rowBytes);
+                    if (dim != null) PixelOps.Dim(s, (byte*)dim + (long)y * rowBytes, rowBytes); // ~39% brightness
                 }
             }
         }

@@ -400,8 +400,8 @@ internal sealed partial class EditorViewModel : ObservableObject
     {
         try
         {
-            await shot.EnsureLoadedAsync();
-            await ClipboardService.CopyImageAsync(ImageExporter.Render(shot.Image, shot.Annotations, shot.Crop.Rect));
+            var (flat, png) = await FlattenAsync(shot);
+            await ClipboardService.CopyImageAsync(flat, png);
             ShowStatus("Copied to clipboard");
         }
         catch (Exception ex)
@@ -419,12 +419,11 @@ internal sealed partial class EditorViewModel : ObservableObject
     {
         try
         {
-            await shot.EnsureLoadedAsync();
-            var flat = ImageExporter.Render(shot.Image, shot.Annotations, shot.Crop.Rect);
+            var (flat, png) = await FlattenAsync(shot);
             if (shot.SavedPath is null)
-                shot.SavedPath = await ImageSaver.SaveAsync(flat, _settings.Current);
+                shot.SavedPath = await ImageSaver.SaveAsync(flat, _settings.Current, png);
             else
-                await ImageSaver.SaveAsync(flat, shot.SavedPath, IsJpg(shot.SavedPath));
+                await ImageSaver.SaveAsync(flat, shot.SavedPath, IsJpg(shot.SavedPath), png);
             MarkSaved(shot);
             ShowStatus("Saved " + Path.GetFileName(shot.SavedPath));
         }
@@ -445,8 +444,8 @@ internal sealed partial class EditorViewModel : ObservableObject
         {
             string? path = await _pickSavePath();
             if (path is null) return;
-            await shot.EnsureLoadedAsync();
-            await ImageSaver.SaveAsync(ImageExporter.Render(shot.Image, shot.Annotations, shot.Crop.Rect), path, IsJpg(path));
+            var (flat, png) = await FlattenAsync(shot);
+            await ImageSaver.SaveAsync(flat, path, IsJpg(path), png);
             shot.SavedPath = path;
             MarkSaved(shot);
             ShowStatus("Saved " + Path.GetFileName(path));
@@ -460,6 +459,18 @@ internal sealed partial class EditorViewModel : ObservableObject
         {
             ReleaseIfIdle(shot);
         }
+    }
+
+    /// <summary>
+    /// The clip as it is exported. One without edits is its capture as it stands, so that comes with the PNG the
+    /// clip already holds, and neither the render nor a second PNG encode is needed.
+    /// </summary>
+    private static async Task<(CapturedImage Flat, byte[]? Png)> FlattenAsync(EditorDocument shot)
+    {
+        await shot.EnsureLoadedAsync();
+        var image = shot.Image;
+        if (shot.Annotations.Count == 0 && shot.Crop.Rect is null) return (image, await shot.GetPngAsync());
+        return (ImageExporter.Render(image, shot.Annotations, shot.Crop.Rect), null);
     }
 
     /// <summary>A clip acted on from the context menu was loaded just for that; drop its pixels again.</summary>

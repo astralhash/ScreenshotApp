@@ -57,7 +57,7 @@ internal static class ClipboardService
         try
         {
             PInvoke.EmptyClipboard();
-            PutGlobal(CF_DIB, BuildDib(image));
+            PutDib(image);
             fixed (char* name = "PNG")
                 PutGlobal(PInvoke.RegisterClipboardFormat(name), png);
         }
@@ -67,12 +67,23 @@ internal static class ClipboardService
         }
     }
 
-    /// <summary>BITMAPINFOHEADER followed by bottom-up BGRA rows (the most widely accepted CF_DIB layout).</summary>
-    private static unsafe byte[] BuildDib(CapturedImage image)
+    /// <summary>
+    /// CF_DIB: BITMAPINFOHEADER followed by bottom-up BGRA rows (the most widely accepted layout), written straight
+    /// into the clipboard's memory block (no intermediate copy of the image).
+    /// </summary>
+    private static unsafe void PutDib(CapturedImage image)
     {
         int header = sizeof(BITMAPINFOHEADER), stride = image.Width * 4;
-        var dib = new byte[header + stride * image.Height];
-        var info = new BITMAPINFOHEADER
+        var handle = PInvoke.GlobalAlloc(GLOBAL_ALLOC_FLAGS.GMEM_MOVEABLE, (nuint)header + (nuint)stride * (nuint)image.Height);
+        if (handle == HGLOBAL.Null) throw new OutOfMemoryException("Could not allocate clipboard memory.");
+
+        byte* target = (byte*)PInvoke.GlobalLock(handle);
+        if (target == null)
+        {
+            PInvoke.GlobalFree(handle);
+            throw new OutOfMemoryException("Could not lock clipboard memory.");
+        }
+        *(BITMAPINFOHEADER*)target = new BITMAPINFOHEADER
         {
             biSize = (uint)header,
             biWidth = image.Width,
@@ -81,11 +92,13 @@ internal static class ClipboardService
             biBitCount = 32,
             biSizeImage = (uint)(stride * image.Height),
         };
-        fixed (byte* d = dib) *(BITMAPINFOHEADER*)d = info;
-
-        for (int y = 0; y < image.Height; y++)
-            Buffer.BlockCopy(image.Pixels, y * stride, dib, header + (image.Height - 1 - y) * stride, stride);
-        return dib;
+        fixed (byte* src = image.Pixels)
+        {
+            for (int y = 0; y < image.Height; y++)
+                Buffer.MemoryCopy(src + (long)y * stride, target + header + (long)(image.Height - 1 - y) * stride, stride, stride);
+        }
+        PInvoke.GlobalUnlock(handle);
+        Commit(CF_DIB, handle);
     }
 
     private static unsafe void PutGlobal(uint format, byte[] data)
@@ -96,7 +109,11 @@ internal static class ClipboardService
         var target = PInvoke.GlobalLock(handle);
         Marshal.Copy(data, 0, (IntPtr)target, data.Length);
         PInvoke.GlobalUnlock(handle);
+        Commit(format, handle);
+    }
 
+    private static unsafe void Commit(uint format, HGLOBAL handle)
+    {
         // On success the clipboard owns the memory; on failure we must free it.
         if (PInvoke.SetClipboardData(format, (HANDLE)handle.Value).IsNull)
         {

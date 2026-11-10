@@ -85,7 +85,11 @@ internal sealed class EditorDocument : INotifyPropertyChanged
     public void RefreshThumbnail()
     {
         if (_pixels is not { } img) return;
-        var flat = Annotations.Count == 0 && Crop.Rect is null ? img : ImageExporter.Render(img, Annotations, Crop.Rect);
+        // Edited clips are flattened and scaled down on the GPU; reading the full-size export back just to
+        // shrink it here cost a 33 MB copy per refresh at 4K.
+        var flat = Annotations.Count == 0 && Crop.Rect is null
+            ? img
+            : ImageExporter.RenderScaled(img, Annotations, Crop.Rect, ThumbWidth, ThumbHeight);
         Thumbnail = MakeThumbnail(flat);
     }
     public List<Annotation> Annotations { get; } = new();

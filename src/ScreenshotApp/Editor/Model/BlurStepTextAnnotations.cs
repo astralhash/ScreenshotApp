@@ -169,13 +169,25 @@ internal sealed class TextAnnotation : Annotation
         WordWrapping = CanvasWordWrapping.NoWrap,
     };
 
+    // Measuring builds a text layout, and hit-testing asks for the bounds on every pointer move:
+    // measure once per text and size.
+    private string? _measuredText;
+    private float _measuredFontSize;
+    private Rect _measured;
+
     public override RectangleF Bounds
     {
         get
         {
-            using var format = CreateFormat(FontSize);
-            using var layout = new CanvasTextLayout(CanvasDevice.GetSharedDevice(), Text.Length == 0 ? " " : Text, format, 100000, 100000);
-            var b = layout.LayoutBounds;
+            if (_measuredText != Text || _measuredFontSize != FontSize)
+            {
+                using var format = CreateFormat(FontSize);
+                using var layout = new CanvasTextLayout(CanvasDevice.GetSharedDevice(), Text.Length == 0 ? " " : Text, format, 100000, 100000);
+                _measured = layout.LayoutBounds;
+                _measuredText = Text;
+                _measuredFontSize = FontSize;
+            }
+            var b = _measured;
             return new RectangleF(Position.X + (float)b.X, Position.Y + (float)b.Y, (float)b.Width, (float)b.Height);
         }
     }

@@ -324,7 +324,9 @@ public partial class App : Application
 
             if (targets.HasFlag(CaptureTargets.File))
             {
-                string path = await ImageSaver.SaveAsync(image, _settings.Current);
+                // A PNG save reuses the clip's compressed copy too.
+                byte[]? png = doc is null || ImageSaver.IsJpg(_settings.Current) ? null : await doc.GetPngAsync();
+                string path = await ImageSaver.SaveAsync(image, _settings.Current, png);
                 if (doc is not null)
                 {
                     doc.SavedPath = path; // Ctrl+S in the editor then overwrites this file

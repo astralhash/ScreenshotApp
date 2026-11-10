@@ -50,6 +50,8 @@ public sealed partial class EditorWindow : Window
     private float _cacheScale;
     private Guid _cacheDocId;
     private Guid? _cacheEditingId;
+    private Guid? _cacheLiveFromId; // the layer stops below this annotation (the one being dragged); the rest is drawn live
+    private float _cacheDipWidth, _cacheDipHeight, _cacheDpi; // what the layer's render target was created with
     private bool _cacheStale = true;
     private bool _cacheTooLarge; // extreme zoom: the layer would exceed the GPU's texture limit, draw live instead
 
@@ -105,8 +107,11 @@ public sealed partial class EditorWindow : Window
             SyncViewRect();
             // While a preview stroke or the crop box is dragged, only freshly drawn screen content changes;
             // the committed annotations are untouched and the cached layer stays valid.
-            bool previewOnly = ViewModel.Interaction.Preview is not null
-                || (ViewModel.Tool == ToolKind.Crop && ViewModel.Interaction.IsDragging);
+            // The same goes for a shape being moved or resized, once the layer was built without it.
+            var interaction = ViewModel.Interaction;
+            bool previewOnly = interaction.Preview is not null
+                || (ViewModel.Tool == ToolKind.Crop && interaction.IsDragging)
+                || (interaction.DragStep && _contentCache is not null && interaction.DraggedId == _cacheLiveFromId);
             if (!previewOnly) _cacheStale = true;
             QueueRedraw();
         };
@@ -703,6 +708,21 @@ public sealed partial class EditorWindow : Window
             ds.Transform = Matrix3x2.Identity;
         }
 
+        // A shape being moved or resized, and whatever lies above it, is left out of the layer and drawn here,
+        // so the drag does not rebuild the layer (a full-image resample) on every pointer move.
+        if (cache is not null && _cacheLiveFromId is { } liveFrom
+            && _doc.Annotations.FindIndex(a => a.Id == liveFrom) is var first and >= 0)
+        {
+            ds.Transform = imageToHost;
+            using (ds.CreateLayer(1f, new Rect(view.X, view.Y, view.Width, view.Height)))
+            {
+                var ctx = new RenderContext(_bitmap);
+                for (int i = first; i < _doc.Annotations.Count; i++)
+                    if (_doc.Annotations[i].Id != ViewModel.Interaction.EditingId) _doc.Annotations[i].Render(ds, ctx);
+            }
+            ds.Transform = Matrix3x2.Identity;
+        }
+
         // The stroke being drawn is the only part that changes on every pointer move.
         if (ViewModel.Interaction.Preview is { } preview)
         {
@@ -721,29 +741,45 @@ public sealed partial class EditorWindow : Window
     {
         if (_doc is null || _bitmap is null) return _contentCache;
 
+        var liveFrom = ViewModel.Interaction.DraggedId;
         bool ready = !_cacheStale && _cacheView == view && Math.Abs(_cacheScale - s) < 1e-4f
             && _cacheDocId == _doc.Id && _cacheEditingId == ViewModel.Interaction.EditingId
+            && _cacheLiveFromId == liveFrom
             && (_contentCache is not null || _cacheTooLarge);
         if (ready) return _contentCache;
 
-        _contentCache?.Dispose();
-        _contentCache = null;
         _cacheView = view;
         _cacheScale = s;
         _cacheDocId = _doc.Id;
         _cacheEditingId = ViewModel.Interaction.EditingId;
+        _cacheLiveFromId = liveFrom;
         _cacheStale = false;
         _cacheTooLarge = false;
 
         // One canvas DIP per rendered pixel (plus the control's DPI), so vector strokes stay crisp. At
         // extreme zoom a full-view layer would outgrow the GPU's texture limit; draw it live instead.
         float pixelsPerDip = canvas.Dpi / 96f;
-        if (view.Width * s * pixelsPerDip > CacheMaxSidePixels || view.Height * s * pixelsPerDip > CacheMaxSidePixels)
+        float dipWidth = view.Width * s, dipHeight = view.Height * s;
+        if (dipWidth * pixelsPerDip > CacheMaxSidePixels || dipHeight * pixelsPerDip > CacheMaxSidePixels)
         {
+            _contentCache?.Dispose();
+            _contentCache = null;
             _cacheTooLarge = true;
             return null;
         }
-        var target = new CanvasRenderTarget(canvas, view.Width * s, view.Height * s, canvas.Dpi);
+
+        // An edit at the same zoom redraws into the texture that is already there.
+        var target = _contentCache;
+        if (target is null || dipWidth != _cacheDipWidth || dipHeight != _cacheDipHeight || canvas.Dpi != _cacheDpi)
+        {
+            _contentCache = null;
+            target?.Dispose();
+            target = new CanvasRenderTarget(canvas, dipWidth, dipHeight, canvas.Dpi);
+            _cacheDipWidth = dipWidth;
+            _cacheDipHeight = dipHeight;
+            _cacheDpi = canvas.Dpi;
+        }
+        _contentCache = null; // not valid again until the drawing below has gone through
         using (var ds = target.CreateDrawingSession())
         {
             ds.Clear(Colors.Transparent);
@@ -757,12 +793,22 @@ public sealed partial class EditorWindow : Window
             {
                 var ctx = new RenderContext(_bitmap);
                 foreach (var a in _doc.Annotations)
+                {
+                    if (a.Id == liveFrom) break; // this one and those above it are drawn live (see Canvas_Draw)
                     if (a.Id != ViewModel.Interaction.EditingId) a.Render(ds, ctx);
+                }
             }
         }
         _contentCache = target;
         return target;
     }
+
+    // Device-independent, so one of each serves every frame.
+    private static readonly Microsoft.Graphics.Canvas.Geometry.CanvasStrokeStyle DashedStyle = new()
+    {
+        DashStyle = Microsoft.Graphics.Canvas.Geometry.CanvasDashStyle.Dash,
+    };
+    private static readonly Microsoft.Graphics.Canvas.Text.CanvasTextFormat CropLabelFormat = new() { FontFamily = "Segoe UI", FontSize = 12 };
 
     /// <summary>Selection outline and handles at a constant on-screen size.</summary>
     private void DrawSelection(CanvasDrawingSession ds, Annotation a)
@@ -773,12 +819,8 @@ public sealed partial class EditorWindow : Window
         if (a.ShowBoundsWhenSelected)
         {
             var b = a.Bounds;
-            using var dashed = new Microsoft.Graphics.Canvas.Geometry.CanvasStrokeStyle
-            {
-                DashStyle = Microsoft.Graphics.Canvas.Geometry.CanvasDashStyle.Dash,
-            };
             var tl = ToScreen(new Vector2(b.Left, b.Top));
-            ds.DrawRectangle(tl.X, tl.Y, b.Width * s, b.Height * s, accent, 1f, dashed);
+            ds.DrawRectangle(tl.X, tl.Y, b.Width * s, b.Height * s, accent, 1f, DashedStyle);
         }
 
         for (int i = 0; i < a.HandleCount; i++)
@@ -815,10 +857,9 @@ public sealed partial class EditorWindow : Window
 
         // Size readout just above the box (or inside when there is no room).
         string label = $"{(int)Math.Round(crop.Width)} × {(int)Math.Round(crop.Height)}";
-        using var format = new Microsoft.Graphics.Canvas.Text.CanvasTextFormat { FontFamily = "Segoe UI", FontSize = 12 };
         float ly = tl.Y > 28 ? tl.Y - 26 : tl.Y + 6;
         ds.FillRoundedRectangle(tl.X, ly, 76, 20, 4, 4, Color.FromArgb(220, 32, 32, 32));
-        ds.DrawText(label, tl.X + 8, ly + 2, Colors.White, format);
+        ds.DrawText(label, tl.X + 8, ly + 2, Colors.White, CropLabelFormat);
     }
 
     private static Vector2 HandlePoint(RectangleF r, int i) => HandleGeometry.Get(r, i);

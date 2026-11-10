@@ -87,6 +87,14 @@ internal sealed class EditorInteraction
 
     public bool IsDragging => _mode != Mode.None;
 
+    /// <summary>The annotation being moved or resized right now, if any. The window draws it (and what lies above
+    /// it) live, so the cached layer below does not have to be rebuilt on every pointer move.</summary>
+    public Guid? DraggedId => _mode is Mode.Move or Mode.Resize ? _selectedId : null;
+
+    /// <summary>True while <see cref="Changed"/> is raised for a pointer move that altered nothing but the
+    /// annotation <see cref="DraggedId"/>.</summary>
+    public bool DragStep { get; private set; }
+
     public void RaiseChanged() => Changed?.Invoke();
 
     private void SetSelected(Guid? id)
@@ -184,7 +192,9 @@ internal sealed class EditorInteraction
             default:
                 return;
         }
-        Changed?.Invoke();
+        DragStep = _mode is Mode.Move or Mode.Resize;
+        try { Changed?.Invoke(); }
+        finally { DragStep = false; }
     }
 
     public void PointerUp(Vector2 p, bool shift)

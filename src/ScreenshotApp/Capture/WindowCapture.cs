@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Microsoft.Graphics.Canvas;
 using ScreenshotApp.Services;
@@ -89,30 +90,35 @@ internal static class WindowCapture
         var backdrop = BackdropColor(src);
         int offX = frozen.ScreenX - srcOrigin.X, offY = frozen.ScreenY - srcOrigin.Y;
 
-        for (int y = 0; y < h; y++)
+        // Whole pixels at a time, over the part of each row the two images share: nearly every pixel is opaque
+        // and is one 32-bit copy.
+        var srcPixels = MemoryMarshal.Cast<byte, uint>(src.AsSpan());
+        var dstPixels = MemoryMarshal.Cast<byte, uint>(dst.AsSpan());
+        int x0 = Math.Max(0, -offX), x1 = Math.Min(w, srcW - offX);
+        int y0 = Math.Max(0, -offY), y1 = Math.Min(h, srcH - offY);
+        for (int y = y0; y < y1 && x1 > x0; y++)
         {
-            int sy = y + offY;
-            if (sy < 0 || sy >= srcH) continue;
-            for (int x = 0; x < w; x++)
+            var srcRow = srcPixels.Slice((y + offY) * srcW + x0 + offX, x1 - x0);
+            var dstRow = dstPixels.Slice(y * w + x0, x1 - x0);
+            for (int i = 0; i < srcRow.Length; i++)
             {
-                int sx = x + offX;
-                if (sx < 0 || sx >= srcW) continue;
-                int s = (sy * srcW + sx) * 4, d = (y * w + x) * 4;
-                int a = src[s + 3];
+                uint pixel = srcRow[i], a = pixel >> 24;
                 if (a == 255)
                 {
-                    Buffer.BlockCopy(src, s, dst, d, 4);
+                    dstRow[i] = pixel;
                     continue;
                 }
                 // Premultiplied "over": what the window lets through comes from the screen behind it, unless a
                 // window in front covered that spot in the frozen screen.
-                bool covered = IsCovered(occluders, frozen.ScreenX + x, frozen.ScreenY + y);
+                bool covered = IsCovered(occluders, frozen.ScreenX + x0 + i, frozen.ScreenY + y);
+                uint behindPixel = dstRow[i], result = 0xFF000000;
                 for (int c = 0; c < 3; c++)
                 {
-                    int behind = covered ? backdrop[c] : dst[d + c];
-                    dst[d + c] = (byte)Math.Min(255, src[s + c] + behind * (255 - a) / 255);
+                    int shift = c * 8;
+                    uint behind = covered ? backdrop[c] : (behindPixel >> shift) & 0xFF;
+                    result |= Math.Min(255u, ((pixel >> shift) & 0xFF) + behind * (255 - a) / 255) << shift;
                 }
-                dst[d + 3] = 255;
+                dstRow[i] = result;
             }
         }
         return new CapturedImage(dst, w, h, frozen.ScreenX, frozen.ScreenY);

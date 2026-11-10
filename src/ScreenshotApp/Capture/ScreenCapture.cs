@@ -101,7 +101,7 @@ internal static unsafe class ScreenCapture
 
                 var pixels = new byte[w * h * 4];
                 Marshal.Copy((IntPtr)bits, pixels, 0, pixels.Length);
-                for (int i = 3; i < pixels.Length; i += 4) pixels[i] = 0xFF; // GDI leaves alpha undefined
+                PixelOps.SetOpaque(pixels); // GDI leaves alpha undefined
                 return new CapturedImage(pixels, w, h, area.X, area.Y);
             }
             finally

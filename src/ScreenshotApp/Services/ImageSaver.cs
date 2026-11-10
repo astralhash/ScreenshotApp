@@ -16,7 +16,8 @@ internal static partial class ImageSaver
     private static partial Regex TokenRegex();
 
     /// <summary>Saves to the configured folder using the filename pattern; returns the full path.</summary>
-    public static async Task<string> SaveAsync(CapturedImage image, AppSettings settings)
+    /// <param name="png">See <see cref="SaveAsync(CapturedImage, string, bool, byte[])"/>.</param>
+    public static async Task<string> SaveAsync(CapturedImage image, AppSettings settings, byte[]? png = null)
     {
         bool jpg = settings.ImageFormat.Equals("jpg", StringComparison.OrdinalIgnoreCase);
         string name = ExpandPattern(settings.FilenamePattern, DateTime.Now);
@@ -27,12 +28,16 @@ internal static partial class ImageSaver
         for (int i = 2; File.Exists(path); i++)
             path = Path.Combine(settings.SaveFolder, $"{name} ({i}){(jpg ? ".jpg" : ".png")}");
 
-        await SaveAsync(image, path, jpg);
+        await SaveAsync(image, path, jpg, png);
         return path;
     }
 
-    public static async Task SaveAsync(CapturedImage image, string path, bool jpg) =>
-        await File.WriteAllBytesAsync(path, await EncodeAsync(image, jpg));
+    /// <param name="png"><paramref name="image"/> already compressed as PNG, if the caller has it: a PNG save then
+    /// writes those bytes instead of encoding the image again.</param>
+    public static async Task SaveAsync(CapturedImage image, string path, bool jpg, byte[]? png = null) =>
+        await File.WriteAllBytesAsync(path, !jpg && png is not null ? png : await EncodeAsync(image, jpg));
+
+    public static bool IsJpg(AppSettings settings) => settings.ImageFormat.Equals("jpg", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Decodes a PNG/JPG file to BGRA pixels (screen position is not meaningful and set to 0,0).</summary>
     public static async Task<CapturedImage> DecodeAsync(string path) =>
