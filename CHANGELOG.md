@@ -5,7 +5,8 @@
 - Editor: moving or resizing a shape is smoother, most of all on large captures. Only the shape you drag is redrawn while you drag it, instead of the whole image.
 - Editor: film-strip thumbnails update with less work after each edit, and hovering over text labels is lighter.
 - Capturing: the selection overlay comes up faster after the hotkey, and window captures finish faster.
-- Copying to the clipboard uses less memory. Saving or copying a clip you have not edited, and the *File* capture target with PNG, no longer compress the image a second time.
+- Copying to the clipboard uses less memory.
+- Saving or copying a clip you have not edited is faster, and so is saving each capture to a file automatically (when that is turned on in Settings and the format is PNG).
 
 ## 0.3.0
 
