@@ -679,10 +679,7 @@ public sealed partial class EditorWindow : Window
         float s = PixelScale;
         float w = view.Width * s, h = view.Height * s;
 
-        // Soft drop shadow: a few expanding translucent rects.
-        for (int i = 1; i <= 8; i++)
-            ds.FillRectangle(_offset.X - i, _offset.Y - i + 3, w + 2 * i, h + 2 * i,
-                Color.FromArgb((byte)(16 - i * 2 > 0 ? 16 - i * 2 : 1), 0, 0, 0));
+        DrawShadow(ds, w, h);
 
         var image = new Rect(0, 0, _doc.Width, _doc.Height);
         var imageToHost = Matrix3x2.CreateTranslation(-view.X, -view.Y) * Matrix3x2.CreateScale(s)
@@ -714,7 +711,9 @@ public sealed partial class EditorWindow : Window
             && _doc.Annotations.FindIndex(a => a.Id == liveFrom) is var first and >= 0)
         {
             ds.Transform = imageToHost;
-            using (ds.CreateLayer(1f, new Rect(view.X, view.Y, view.Width, view.Height)))
+            bool clip = false;
+            for (int i = first; i < _doc.Annotations.Count && !clip; i++) clip = ReachesOutside(_doc.Annotations[i], view);
+            using (clip ? ds.CreateLayer(1f, new Rect(view.X, view.Y, view.Width, view.Height)) : null)
             {
                 var ctx = new RenderContext(_bitmap);
                 for (int i = first; i < _doc.Annotations.Count; i++)
@@ -727,13 +726,62 @@ public sealed partial class EditorWindow : Window
         if (ViewModel.Interaction.Preview is { } preview)
         {
             ds.Transform = imageToHost;
-            using (ds.CreateLayer(1f, new Rect(view.X, view.Y, view.Width, view.Height)))
+            using (ReachesOutside(preview, view) ? ds.CreateLayer(1f, new Rect(view.X, view.Y, view.Width, view.Height)) : null)
                 preview.Render(ds, new RenderContext(_bitmap));
             ds.Transform = Matrix3x2.Identity;
         }
 
         if (ViewModel.Tool == ToolKind.Crop) DrawCropOverlay(ds, s);
         else if (ViewModel.Interaction.Selected is { } selected) DrawSelection(ds, selected);
+    }
+
+    /// <summary>
+    /// Whether a live-drawn shape may paint outside the visible image and so needs the clip layer. The layer is
+    /// an offscreen surface the size of the whole view, composited back every frame; most drags don't need it.
+    /// The margin covers stroke half-widths, arrow heads (2x width off the line) and text overhang.
+    /// </summary>
+    private static bool ReachesOutside(Annotation a, RectangleF view)
+    {
+        var b = a.Bounds;
+        float m = a.StrokeWidth * 3f + 4f;
+        return b.Left - m < view.Left || b.Top - m < view.Top || b.Right + m > view.Right || b.Bottom + m > view.Bottom;
+    }
+
+    // Soft drop shadow: 8 nested translucent rects, the i-th grown by i DIPs and offset 3 DIPs down, alpha
+    // 16 - 2i (min 1). Stacked as full rects they blended the whole image area 8 times per frame (most of
+    // the canvas's fill cost while dragging); only the 1-DIP rings outside the image are visible, so each ring
+    // is filled once with the alpha the stack composites to there.
+    private const int ShadowRings = 8, ShadowDrop = 3;
+    private static readonly Color[] ShadowRingColors = BuildShadowRingColors();
+
+    /// <summary>[k] = colour of ring k (1..8), covered by rects k..8; [0] = inside rect 0 (covered by all 8).</summary>
+    private static Color[] BuildShadowRingColors()
+    {
+        var colors = new Color[ShadowRings + 1];
+        double transmit = 1;
+        for (int k = ShadowRings; k >= 1; k--)
+        {
+            transmit *= 1 - Math.Max(16 - 2 * k, 1) / 255.0;
+            colors[k] = Color.FromArgb((byte)Math.Round((1 - transmit) * 255), 0, 0, 0);
+        }
+        colors[0] = colors[1];
+        return colors;
+    }
+
+    private void DrawShadow(CanvasDrawingSession ds, float w, float h)
+    {
+        float x = _offset.X, y = _offset.Y + ShadowDrop;
+        // Rect 0 (the image's own rect, dropped) shows only below the image.
+        ds.FillRectangle(x, _offset.Y + h, w, ShadowDrop, ShadowRingColors[0]);
+        for (int k = 1; k <= ShadowRings; k++)
+        {
+            var c = ShadowRingColors[k];
+            float l = x - k, t = y - k, rw = w + 2 * k, rh = h + 2 * k;
+            ds.FillRectangle(l, t, rw, 1, c);              // top
+            ds.FillRectangle(l, t + rh - 1, rw, 1, c);     // bottom
+            ds.FillRectangle(l, t + 1, 1, rh - 2, c);      // left
+            ds.FillRectangle(l + rw - 1, t + 1, 1, rh - 2, c); // right
+        }
     }
 
     /// <summary>The cached visible content layer (image + annotations), rebuilt when invalid.</summary>
