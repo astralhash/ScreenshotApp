@@ -601,17 +601,13 @@ public sealed partial class EditorWindow : Window
         ViewModel.EmptyBin();
     }
 
-    private EditorDocument? _hoveredClip;
-
     private void Thumb_PointerEntered(object sender, PointerRoutedEventArgs e)
     {
-        if (sender is FrameworkElement { Tag: EditorDocument doc }) _hoveredClip = doc;
         SetRemoveVisible(sender, true);
     }
 
     private void Thumb_PointerExited(object sender, PointerRoutedEventArgs e)
     {
-        if (sender is FrameworkElement { Tag: EditorDocument doc } && doc == _hoveredClip) _hoveredClip = null;
         SetRemoveVisible(sender, false);
     }
 
@@ -1086,13 +1082,6 @@ public sealed partial class EditorWindow : Window
     private void Root_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
         if (FocusManager.GetFocusedElement(Root.XamlRoot) is TextBox) return;
-        if (e.Key == VirtualKey.Delete && _hoveredClip is { } hovered)
-        {
-            _hoveredClip = null;
-            ViewModel.RemoveShot(hovered);
-            e.Handled = true;
-            return;
-        }
         if (e.Key is VirtualKey.Left or VirtualKey.Right && ViewModel.SelectedShot is { } current
             && !InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down)
             && !InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Menu).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down))
