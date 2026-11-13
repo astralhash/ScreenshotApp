@@ -2,9 +2,9 @@
 
 ## 0.3.2
 
-- Share Region: give control in Teams and their clicks land right where they point.
-- Editor: Delete closes the clip you have open, never the one under the mouse.
-- Editor: dragging shapes and drawing are lighter on the graphics card.
+- Share Region: when giving control the clicks land in the correct spot
+- Editor: Delete closes the clip you have open, not the one under the mouse cursor
+- Editor: dragging shapes and drawing tax the GPU less
 
 ## 0.3.1
 
