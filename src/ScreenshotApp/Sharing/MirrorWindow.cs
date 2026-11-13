@@ -27,7 +27,6 @@ namespace ScreenshotApp.Sharing;
 internal sealed class MirrorWindow : Window
 {
     public const string WindowTitle = "Shared region";
-    private const int OffScreenGap = 64; // between the virtual screen and the window, in physical pixels
 
     private readonly CanvasDevice _device;
     private readonly CanvasSwapChainPanel _panel = new();
@@ -72,12 +71,12 @@ internal sealed class MirrorWindow : Window
         RemoveTaskbarButton();
     }
 
-    /// <summary>Client area = region size, the whole window just left of the virtual screen.</summary>
+    /// <summary>Client area = region size, the whole window left of the virtual screen (see <see cref="MoveOffScreen"/>).</summary>
     public void SetRegion(Rectangle region)
     {
         RemoveFrame();
         // Off-screen first, so a DPI change from moving cannot rescale the size set next.
-        MoveOffScreen();
+        MoveOffScreen(region);
         var want = new SizeInt32(region.Width, region.Height);
         AppWindow.ResizeClient(want);
         // ResizeClient may still allow for a frame this window does not have: correct by the real client size.
@@ -86,7 +85,7 @@ internal sealed class MirrorWindow : Window
             var outer = AppWindow.Size;
             AppWindow.Resize(new SizeInt32(outer.Width + want.Width - client.right, outer.Height + want.Height - client.bottom));
         }
-        MoveOffScreen(); // again for the new width
+        MoveOffScreen(region); // again for the new width
     }
 
     public void CloseWindow()
@@ -158,10 +157,20 @@ internal sealed class MirrorWindow : Window
             | SET_WINDOW_POS_FLAGS.SWP_NOSIZE | SET_WINDOW_POS_FLAGS.SWP_NOZORDER | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE);
     }
 
-    private void MoveOffScreen()
+    /// <summary>
+    /// Exactly one virtual-screen width left of the region, at the region's height. Teams' "give control" injects the
+    /// viewer's clicks at the shared window's position plus the offset in it; for this off-screen window that position
+    /// is negative, and the injected coordinates wrap around by the screen width (seen in a logged Teams session:
+    /// with the window 64 px further left, every click landed 64 px left of the target). From here they wrap onto
+    /// the region itself. The window still lies wholly off-screen, as region.Right &lt;= the virtual screen's right.
+    /// </summary>
+    private void MoveOffScreen(Rectangle region)
     {
         var screen = Monitors.VirtualScreen;
-        AppWindow.Move(new PointInt32(screen.Left - AppWindow.Size.Width - OffScreenGap, screen.Top));
+        int x = region.X - screen.Width;
+        // Before the resize the window may still be wider than the region: keep it off-screen meanwhile.
+        if (x + AppWindow.Size.Width > screen.Left) x = screen.Left - AppWindow.Size.Width;
+        AppWindow.Move(new PointInt32(x, region.Y));
     }
 
     /// <summary>

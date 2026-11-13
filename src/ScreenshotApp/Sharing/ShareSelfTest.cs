@@ -38,6 +38,8 @@ internal static class ShareSelfTest
         PInvoke.GetWindowRect(hwnd, out var wr);
         var bounds = Rectangle.FromLTRB(wr.left, wr.top, wr.right, wr.bottom);
         Check("off-screen", !bounds.IntersectsWith(Monitors.VirtualScreen), bounds.ToString());
+        Check("one screen width left of the region (Teams' injected clicks wrap onto it)",
+            bounds.X + Monitors.VirtualScreen.Width == region.X && bounds.Y == region.Y, $"{bounds.Location} vs region {region.Location}");
         var frame = OperatingSystem.IsWindowsVersionAtLeast(10, 0, 19041) ? await WindowCapture.GrabAsync(hwnd) : null;
         Check("window capture delivers a frame", frame is not null);
         if (frame is { } f)
