@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.2
+
+- Share Region: when you give control to someone in Teams, their clicks now land where they point in the shared region. Before, they could land off to the side, or by a few dozen pixels when the region touched the right edge of the screen.
+- Editor: Delete removes the clip you have open. Before, it removed the thumbnail under the mouse pointer instead, if there was one.
+- Editor: dragging shapes and drawing take less graphics work.
+
 ## 0.3.1
 
 - Editor: moving or resizing a shape is smoother, most of all on large captures. Only the shape you drag is redrawn while you drag it, instead of the whole image.
