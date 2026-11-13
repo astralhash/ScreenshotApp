@@ -2,9 +2,9 @@
 
 ## 0.3.2
 
-- Share Region: when you give control to someone in Teams, their clicks now land where they point in the shared region. Before, they could land off to the side, or by a few dozen pixels when the region touched the right edge of the screen.
-- Editor: Delete removes the clip you have open. Before, it removed the thumbnail under the mouse pointer instead, if there was one.
-- Editor: dragging shapes and drawing take less graphics work.
+- Share Region: give control in Teams and their clicks land right where they point.
+- Editor: Delete closes the clip you have open, never the one under the mouse.
+- Editor: dragging shapes and drawing are lighter on the graphics card.
 
 ## 0.3.1
 
