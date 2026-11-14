@@ -50,6 +50,13 @@ public partial class App : Application
             Exit();
             return;
         }
+        if (Environment.GetCommandLineArgs().FirstOrDefault(a => a.StartsWith("--selftest-scroll-window=", StringComparison.OrdinalIgnoreCase)) is { } scrollWindow)
+        {
+            try { await ScrollSelfTest.RunOnWindowAsync(scrollWindow["--selftest-scroll-window=".Length..]); }
+            catch (Exception ex) { Log.Error(ex); }
+            Exit();
+            return;
+        }
         if (Environment.GetCommandLineArgs().Contains("--selftest-scroll-live", StringComparer.OrdinalIgnoreCase))
         {
             try { await ScrollSelfTest.RunLiveAsync(); }

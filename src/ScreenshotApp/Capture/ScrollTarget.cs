@@ -76,10 +76,10 @@ internal static unsafe class ScrollAutomation
         var scrollWindow = FindScrollWindow(window, point);
 
         IUIAutomationElement* element = null;
-        Rectangle area = Rectangle.Empty;
+        Rectangle area = Rectangle.Empty, document = Rectangle.Empty;
         try
         {
-            element = FindElement(window, point, out area);
+            element = FindElement(window, point, out area, out document);
         }
         catch (Exception ex)
         {
@@ -94,7 +94,11 @@ internal static unsafe class ScrollAutomation
 
         if (element is null)
         {
-            area = scrollWindow != HWND.Null ? ClientBounds(scrollWindow) : ClientBounds(window);
+            // No ScrollPattern (e.g. Firefox): the page's Document element still gives the right area (without the
+            // browser's toolbars); it is then scrolled with WM_VSCROLL or the wheel.
+            document = Rectangle.Intersect(document, frame);
+            area = document.Width >= MinArea && document.Height >= MinArea ? document
+                : scrollWindow != HWND.Null ? ClientBounds(scrollWindow) : ClientBounds(window);
             area = Rectangle.Intersect(area, frame);
             if (area.Width < MinArea || area.Height < MinArea) area = frame;
         }
@@ -131,9 +135,10 @@ internal static unsafe class ScrollAutomation
         }
     }
 
-    private static IUIAutomationElement* FindElement(HWND window, Point point, out Rectangle bestRect)
+    /// <param name="documentRect">The outermost Document element under the point (a web page), or empty.</param>
+    private static IUIAutomationElement* FindElement(HWND window, Point point, out Rectangle bestRect, out Rectangle documentRect)
     {
-        bestRect = Rectangle.Empty;
+        bestRect = documentRect = Rectangle.Empty;
         var automation = Automation();
         var root = automation->ElementFromHandle(window);
         if (root is null) return null;
@@ -144,6 +149,7 @@ internal static unsafe class ScrollAutomation
         try
         {
             cache->AddProperty(UIA_PROPERTY_ID.UIA_BoundingRectanglePropertyId);
+            cache->AddProperty(UIA_PROPERTY_ID.UIA_IsOffscreenPropertyId);
             for (int depth = 0; depth < 48 && current is not null; depth++)
             {
                 if (IsVerticallyScrollable(current))
@@ -153,6 +159,8 @@ internal static unsafe class ScrollAutomation
                     best = current;
                     bestRect = ToRectangle(current->CurrentBoundingRectangle);
                 }
+                if (documentRect.IsEmpty && IsDocument(current))
+                    documentRect = ToRectangle(current->CurrentBoundingRectangle);
 
                 // Step into the smallest child that contains the point.
                 IUIAutomationElement* next = null;
@@ -169,7 +177,8 @@ internal static unsafe class ScrollAutomation
                             if (child is null) continue;
                             var r = ToRectangle(child->CachedBoundingRectangle);
                             long size = (long)r.Width * r.Height;
-                            if (r.Contains(point) && size > 0 && size < nextArea)
+                            // Hidden popups (Firefox lists its closed menus with bounds over the page) are offscreen.
+                            if (r.Contains(point) && size > 0 && size < nextArea && !child->CachedIsOffscreen)
                             {
                                 if (next is not null) next->Release();
                                 next = child;
@@ -206,6 +215,12 @@ internal static unsafe class ScrollAutomation
         {
             return false;
         }
+    }
+
+    private static bool IsDocument(IUIAutomationElement* element)
+    {
+        try { return element->CurrentControlType == UIA_CONTROLTYPE_ID.UIA_DocumentControlTypeId; }
+        catch (COMException) { return false; }
     }
 
     private static Rectangle ToRectangle(RECT r) => Rectangle.FromLTRB(r.left, r.top, r.right, r.bottom);
@@ -246,15 +261,16 @@ internal static unsafe class ScrollAutomation
     /// <see cref="ScrollMethod.Automation"/>, and a count of lines / wheel notches otherwise. False when the method
     /// is unavailable, failed, or there is nothing left to scroll. Blocking: call on a background thread.
     /// </summary>
-    public static bool Step(ScrollTarget target, ScrollMethod method, double amount)
+    /// <param name="up">Scroll back up by the same amount (undoing a step that went too far).</param>
+    public static bool Step(ScrollTarget target, ScrollMethod method, double amount, bool up = false)
     {
         try
         {
             return method switch
             {
-                ScrollMethod.Automation => StepAutomation(target, amount),
-                ScrollMethod.ScrollMessage => StepMessage(target, amount),
-                _ => StepWheel(target, amount),
+                ScrollMethod.Automation => StepAutomation(target, amount, up),
+                ScrollMethod.ScrollMessage => StepMessage(target, amount, up),
+                _ => StepWheel(target, amount, up),
             };
         }
         catch (Exception ex)
@@ -264,7 +280,11 @@ internal static unsafe class ScrollAutomation
         }
     }
 
-    private static bool StepAutomation(ScrollTarget target, double fraction)
+    /// <summary>What a step of <paramref name="amount"/> really sends: lines and notches are whole numbers.</summary>
+    public static double Units(ScrollMethod method, double amount) =>
+        method == ScrollMethod.Automation ? amount : Math.Max(1, Math.Round(amount));
+
+    private static bool StepAutomation(ScrollTarget target, double fraction, bool up)
     {
         if (!target.HasElement) return false;
         Automation();
@@ -274,9 +294,10 @@ internal static unsafe class ScrollAutomation
         {
             double view = pattern->CurrentVerticalViewSize, percent = pattern->CurrentVerticalScrollPercent;
             if (percent < 0 || view <= 0 || view >= 100) return false;
-            if (percent >= 99.999) return false; // at the bottom
+            if (!up && percent >= 99.999) return false; // at the bottom
             // Percent covers the scroll range (total - view), view size is a percentage of the total.
-            double next = Math.Min(100, percent + fraction * 100 * view / (100 - view));
+            double delta = fraction * 100 * view / (100 - view);
+            double next = Math.Clamp(up ? percent - delta : percent + delta, 0, 100);
             try
             {
                 pattern->SetScrollPercent(NoScroll, next);
@@ -285,7 +306,8 @@ internal static unsafe class ScrollAutomation
             {
                 int lines = Math.Max(1, (int)Math.Round(fraction * 10));
                 for (int i = 0; i < lines; i++)
-                    pattern->Scroll(ScrollAmount.ScrollAmount_NoAmount, ScrollAmount.ScrollAmount_SmallIncrement);
+                    pattern->Scroll(ScrollAmount.ScrollAmount_NoAmount,
+                        up ? ScrollAmount.ScrollAmount_SmallDecrement : ScrollAmount.ScrollAmount_SmallIncrement);
             }
             return true;
         }
@@ -295,19 +317,20 @@ internal static unsafe class ScrollAutomation
         }
     }
 
-    private static bool StepMessage(ScrollTarget target, double lines)
+    private static bool StepMessage(ScrollTarget target, double lines, bool up)
     {
         if (target.ScrollWindow == HWND.Null) return false;
         int n = Math.Max(1, (int)Math.Round(lines));
+        var command = up ? SCROLLBAR_COMMAND.SB_LINEUP : SCROLLBAR_COMMAND.SB_LINEDOWN;
         for (int i = 0; i < n; i++)
-            if (!PInvoke.PostMessage(target.ScrollWindow, PInvoke.WM_VSCROLL, (nuint)SCROLLBAR_COMMAND.SB_LINEDOWN, 0)) return false;
+            if (!PInvoke.PostMessage(target.ScrollWindow, PInvoke.WM_VSCROLL, (nuint)command, 0)) return false;
         return true;
     }
 
     /// <summary>Where the wheel method last put the cursor; the user moving it away stops the capture.</summary>
     public static Point? WheelCursor { get; private set; }
 
-    private static bool StepWheel(ScrollTarget target, double notches)
+    private static bool StepWheel(ScrollTarget target, double notches, bool up)
     {
         var a = target.Area;
         var centre = new Point(a.X + a.Width / 2, a.Y + a.Height / 2);
@@ -320,11 +343,16 @@ internal static unsafe class ScrollAutomation
         }
         PInvoke.SetCursorPos(centre.X, centre.Y);
         WheelCursor = centre;
+        // One event per notch: some apps clamp or mishandle a single large delta.
         int n = Math.Max(1, (int)Math.Round(notches));
-        var input = new INPUT { type = INPUT_TYPE.INPUT_MOUSE };
-        input.mi.dwFlags = MOUSE_EVENT_FLAGS.MOUSEEVENTF_WHEEL;
-        input.mi.mouseData = unchecked((uint)(-120 * n));
-        return PInvoke.SendInput([input], sizeof(INPUT)) == 1;
+        var inputs = new INPUT[n];
+        for (int i = 0; i < n; i++)
+        {
+            inputs[i].type = INPUT_TYPE.INPUT_MOUSE;
+            inputs[i].mi.dwFlags = MOUSE_EVENT_FLAGS.MOUSEEVENTF_WHEEL;
+            inputs[i].mi.mouseData = unchecked((uint)(up ? 120 : -120));
+        }
+        return PInvoke.SendInput(inputs, sizeof(INPUT)) == n;
     }
 
     public static void ResetWheel() => WheelCursor = null;

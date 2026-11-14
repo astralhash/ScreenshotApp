@@ -17,6 +17,7 @@ internal static class ScrollCapture
     private const double TargetStep = 0.5;   // aim to scroll half the area per step
     private const int NewFrameTimeoutMs = 700, QuietMs = 150, SettleTimeoutMs = 2000, PollMs = 25;
     private const int MaxSteps = 2000;
+    private const double MaxWheelNotches = 10, MaxLines = 60; // a misread step must not snowball
 
     public static bool IsActive { get; private set; }
 
@@ -62,9 +63,14 @@ internal static class ScrollCapture
                 [ScrollMethod.ScrollMessage] = 5,       // lines
                 [ScrollMethod.Wheel] = 2,               // notches
             };
-            int mi = 0, still = 0;
+            // Largest scroll per unit (notch, line, view fraction) seen so far: sizing the step from it never
+            // overshoots, even when an app scrolls unevenly (Firefox: 180 to 360 px per notch).
+            var perUnit = new Dictionary<ScrollMethod, double>();
+            int mi = 0, still = 0, retries = 0;
             bool working = false; // the current method has moved the area at least once
             string reason = "end reached";
+            Log.Info($"Scroll capture: area {captured}, UIA element {target.HasElement}, scroll window {target.ScrollWindow != default}, methods {string.Join("/", methods)}.");
+            await DumpAsync(first, captured, 0);
 
             for (int step = 0; step < MaxSteps; step++)
             {
@@ -86,18 +92,27 @@ internal static class ScrollCapture
                     break;
                 }
                 var result = await Task.Run(() => stitcher.Add(frame));
+                await DumpAsync(frame, captured, step + 1);
+                Log.Info($"Scroll capture step {step + 1}: {method} x{amounts[method]:0.##} → {result} ({stitcher.LastInfo})");
                 switch (result)
                 {
                     case StitchResult.Added:
+                    {
                         working = true;
-                        still = 0;
-                        // Adjust the step so the next one scrolls about half the area.
-                        double ratio = Math.Clamp(TargetStep * captured.Height / Math.Max(1, stitcher.LastOffset), 0.5, 2);
-                        amounts[method] = method == ScrollMethod.Automation
-                            ? Math.Clamp(amounts[method] * ratio, 0.1, 0.8)
-                            : Math.Max(1, amounts[method] * ratio);
+                        still = retries = 0;
+                        // Size the next step to scroll about half the area at the largest rate seen so far.
+                        double rate = stitcher.LastOffset / ScrollAutomation.Units(method, amounts[method]);
+                        perUnit[method] = Math.Max(rate, perUnit.GetValueOrDefault(method));
+                        double wanted = TargetStep * captured.Height / perUnit[method];
+                        amounts[method] = method switch
+                        {
+                            ScrollMethod.Automation => Math.Clamp(wanted, 0.1, 0.8),
+                            ScrollMethod.Wheel => Math.Clamp(Math.Floor(wanted), 1, MaxWheelNotches),
+                            _ => Math.Clamp(Math.Floor(wanted), 1, MaxLines),
+                        };
                         toolbar.SetText($"Scrolling capture… {stitcher.Height:N0} px  ·  Esc to stop");
                         break;
+                    }
                     case StitchResult.Full:
                         reason = "height limit";
                         step = MaxSteps;
@@ -110,9 +125,24 @@ internal static class ScrollCapture
                         else if (++still >= 2) step = MaxSteps;
                         break;
                     case StitchResult.NoMatch:
+                    {
+                        // Probably scrolled too far: go back by the same amount and retry with half the step.
+                        double smaller = ScrollAutomation.Units(method, amounts[method]) / 2;
+                        bool canShrink = method == ScrollMethod.Automation ? smaller >= 0.1 : smaller >= 1;
+                        if (retries < 3 && canShrink)
+                        {
+                            retries++;
+                            long beforeBack = source.FrameCount;
+                            await Task.Run(() => ScrollAutomation.Step(target, method, amounts[method], up: true));
+                            await NextFrameAsync(source, beforeBack, Stopping);
+                            amounts[method] = method == ScrollMethod.Automation ? smaller : Math.Floor(smaller);
+                            Log.Info($"Scroll capture: frames did not line up; scrolled back, retrying with x{amounts[method]:0.##}.");
+                            break;
+                        }
                         reason = "frames did not line up";
                         step = MaxSteps;
                         break;
+                    }
                 }
             }
 
@@ -155,6 +185,24 @@ internal static class ScrollCapture
             while (source.FrameCount == 0 && Environment.TickCount64 - start < 1700) await Task.Delay(PollMs);
         }
         return await Task.Run(source.Read);
+    }
+
+    /// <summary>Debug: a folder to save every frame to (frame-000.png, …); null for none.</summary>
+    public static string? DumpFolder { get; set; }
+
+    private static async Task DumpAsync(byte[] frame, Rectangle size, int index)
+    {
+        if (DumpFolder is null) return;
+        try
+        {
+            Directory.CreateDirectory(DumpFolder);
+            var copy = (byte[])frame.Clone();
+            for (int i = 3; i < copy.Length; i += 4) copy[i] = 0xFF;
+            using var bitmap = CanvasBitmap.CreateFromBytes(CanvasDevice.GetSharedDevice(), copy, size.Width, size.Height,
+                Windows.Graphics.DirectX.DirectXPixelFormat.B8G8R8A8UIntNormalized);
+            await bitmap.SaveAsync(Path.Combine(DumpFolder, $"frame-{index:000}.png"));
+        }
+        catch (Exception ex) { Log.Error(ex); }
     }
 
     /// <summary>

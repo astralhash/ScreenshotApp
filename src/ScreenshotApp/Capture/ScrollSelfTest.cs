@@ -60,6 +60,83 @@ internal static class ScrollSelfTest
             }
         }
 
+        // A sticky left column (never scrolls) and a floating bar fixed 10 px above the bottom, like a shop page.
+        {
+            const int view = 700, side = 100, barTop = view - 60, barBottom = view - 10, barLeft = 250, barRight = 450;
+            const int ReleaseAt = 3000;
+            var stitcher = new ScrollStitcher(W, view, 100_000, Scrollbar);
+            var results = new List<StitchResult>();
+            byte[] Shop(int pos)
+            {
+                var f = Frame(page, pos, 0, 0, view, true);
+                // The column first scrolls at a third of the page's speed, then sticks (a tall sticky panel).
+                // After page position 3000 its container ends: it scrolls away with the page and the page's own
+                // content shows in those columns.
+                int lag = Math.Min(pos / 3, 200), panelEnd = pos <= ReleaseAt ? view : Math.Max(0, view - (pos - ReleaseAt));
+                for (int y = 0; y < panelEnd; y++)
+                for (int x = 0; x < side; x++)
+                    SetPixel(f, x, y, (byte)((y + lag) * 7), (byte)(x * 3), (byte)((y + lag) ^ x));
+                // A highlight moving through it as the page scrolls, like a table of contents marking the section.
+                int hl = 50 + pos / 7 % 500;
+                for (int y = hl; y < Math.Min(hl + 20, panelEnd); y++)
+                for (int x = 10; x < 90; x++) // the active entry, highlighted across the column
+                    SetPixel(f, x, y, 0x20, 0x90, 0xFF);
+                for (int y = barTop; y < barBottom; y++)
+                for (int x = barLeft; x < barRight; x++)
+                    SetPixel(f, x, y, 0x10, (byte)(0xB0 + (x + y) % 40), 0xF0);
+                return f;
+            }
+            int pos = 0;
+            while (true)
+            {
+                results.Add(stitcher.Add(Shop(pos)));
+                if (pos == page.Rows - view) break;
+                pos = Math.Min(page.Rows - view, pos + 350);
+            }
+            var image = stitcher.Build(0, 0);
+            Check("sticky column + floating bar: every step matched", results.All(r => r == StitchResult.Added), string.Join(",", results));
+            Check("sticky column + floating bar: height", image.Height == page.Rows, $"{image.Height} vs {page.Rows}");
+            if (image.Height == page.Rows)
+            {
+                // The scrolling columns must be the page; the bar may only be at the very end (it covers the last view).
+                int bad = 0, stride = W * 4;
+                for (int y = 0; y < image.Height; y++)
+                {
+                    bool barRows = y >= image.Height - view + barTop && y < image.Height - view + barBottom;
+                    for (int x = side; x < image.Width; x++)
+                    {
+                        if (barRows && x >= barLeft && x < barRight) continue;
+                        int i = y * image.Width * 4 + x * 4, j = y * stride + x * 4;
+                        if (image.Pixels[i] != page.Pixels[j] || image.Pixels[i + 1] != page.Pixels[j + 1] || image.Pixels[i + 2] != page.Pixels[j + 2]) { bad++; break; }
+                    }
+                }
+                Check("sticky column + floating bar: content identical, bar once", bad == 0, $"{bad} rows differ");
+
+                // Below the first view, while the column is sticky, it must be plain fill (shown once, not repeated).
+                var px = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(image.Pixels.AsSpan());
+                int notFilled = 0;
+                var where = new List<int>();
+                for (int y = view; y < ReleaseAt; y++)
+                    if (px.Slice(y * image.Width, side).IndexOfAnyExcept(px[y * image.Width]) >= 0)
+                    {
+                        notFilled++;
+                        if (where.Count < 8) where.Add(y);
+                    }
+                Check("sticky column + floating bar: sticky column shown once", notFilled == 0,
+                    $"{notFilled} rows not filled, near rows {string.Join(",", where.Take(8))}");
+
+                // Once the column has scrolled away, the page content that came into those columns must be kept.
+                int lost = 0;
+                for (int y = ReleaseAt + view; y < image.Height - view; y++)
+                    for (int x = 0; x < side; x++)
+                    {
+                        int i = (y * image.Width + x) * 4, j = (y * W + x) * 4;
+                        if (image.Pixels[i] != page.Pixels[j] || image.Pixels[i + 1] != page.Pixels[j + 1]) { lost++; break; }
+                    }
+                Check("sticky column + floating bar: content after the column is kept", lost == 0, $"{lost} rows differ");
+            }
+        }
+
         // Height limit.
         {
             var stitcher = new ScrollStitcher(W, 600, 2000, Scrollbar);
@@ -154,6 +231,67 @@ internal static class ScrollSelfTest
         }
         Log.Info($"SELFTEST scroll-live {(allOk ? "ALL PASS" : "FAILED")}");
         return allOk;
+    }
+
+    /// <summary>
+    /// <c>--selftest-scroll-window=&lt;process&gt;</c>: runs a real scrolling capture (wheel allowed) on the first visible
+    /// window of that process, at its centre, logging every step and saving every frame to %TEMP%\scroll-dump.
+    /// The stitched result goes to %TEMP%\scroll-dump\result.png. For diagnosing a specific app.
+    /// </summary>
+    public static async Task RunOnWindowAsync(string spec)
+    {
+        // "<process>" or "<process>,back=<wheel notches to scroll up first>"
+        var parts = spec.Split(',');
+        string processName = parts[0];
+        int back = parts.Skip(1).Where(p => p.StartsWith("back=")).Select(p => int.Parse(p[5..])).FirstOrDefault();
+        var dump = Path.Combine(Path.GetTempPath(), "scroll-dump");
+        if (Directory.Exists(dump)) Directory.Delete(dump, true);
+        ScrollCapture.DumpFolder = dump;
+
+        WindowInfo? found = null;
+        foreach (var w in WindowEnumerator.GetVisibleWindows())
+        {
+            try
+            {
+                using var p = System.Diagnostics.Process.GetProcessById((int)ProcessOf(w.Handle));
+                if (p.ProcessName.Equals(processName, StringComparison.OrdinalIgnoreCase)) { found = w; break; }
+            }
+            catch (ArgumentException) { }
+        }
+        if (found is not { } win)
+        {
+            Log.Info($"SELFTEST scroll-window: no visible window of '{processName}'.");
+            return;
+        }
+        var b = win.Bounds;
+        var centre = new System.Drawing.Point(b.X + b.Width / 2, b.Y + b.Height / 2);
+        using var target = await Task.Run(() => ScrollAutomation.Find(win.Handle, centre));
+        Log.Info($"SELFTEST scroll-window: window {b}, area {target.Area}, UIA element {target.HasElement}.");
+        if (back > 0)
+        {
+            // Scroll back up first (wheel notches), e.g. to capture the last screens of a page again.
+            for (int i = 0; i < back; i += 10)
+            {
+                int n = Math.Min(10, back - i);
+                await Task.Run(() => ScrollAutomation.Step(target, ScrollMethod.Wheel, n, up: true));
+                await Task.Delay(150);
+            }
+            await Task.Delay(800);
+            ScrollAutomation.ResetWheel();
+        }
+        var image = await ScrollCapture.RunAsync(target);
+        if (image is null) return;
+        using var bitmap = Microsoft.Graphics.Canvas.CanvasBitmap.CreateFromBytes(Microsoft.Graphics.Canvas.CanvasDevice.GetSharedDevice(),
+            image.Pixels, image.Width, image.Height, Windows.Graphics.DirectX.DirectXPixelFormat.B8G8R8A8UIntNormalized);
+        await bitmap.SaveAsync(Path.Combine(dump, "result.png"));
+        Log.Info($"SELFTEST scroll-window: result {image.Width}x{image.Height} in {dump}");
+    }
+
+    private static unsafe uint ProcessOf(Windows.Win32.Foundation.HWND hwnd)
+    {
+        uint pid;
+        Windows.Win32.PInvoke.GetWindowThreadProcessId(hwnd, &pid);
+        return pid;
     }
 
     private sealed record Page(byte[] Pixels, int Rows, byte[] Header, byte[] Footer);
