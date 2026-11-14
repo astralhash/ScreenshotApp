@@ -366,7 +366,7 @@
 
         <!-- Start page: shown while there are no clips -->
         <StackPanel Grid.Row="1" Grid.RowSpan="4" HorizontalAlignment="Center" VerticalAlignment="Center"
-                    Spacing="18" MaxWidth="560" Padding="24"
+                    Spacing="18" MaxWidth="600" Padding="24"
                     Visibility="{x:Bind ViewModel.IsEmpty, Mode=OneWay}">
             <FontIcon Glyph="&#xE91B;" FontFamily="Segoe Fluent Icons" FontSize="48" HorizontalAlignment="Center"
                       Foreground="{ThemeResource TextFillColorTertiaryBrush}" />

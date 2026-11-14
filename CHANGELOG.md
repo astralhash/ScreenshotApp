@@ -1,8 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
 
-- Capture: scrolling window capture (Ctrl+Alt+Print Screen) captures a scrollable area down to its end
+- Capture: scrolling window capture (Ctrl+Alt+Print Screen, tray menu, editor start page) captures a scrollable area down to its end
+- Capture: in scrolling captures, sticky headers, side columns and bottom bars appear only once
+- Capture: scrolling capture works in Firefox and other browsers, Esc or Stop ends it early
 
 ## 0.3.2
 

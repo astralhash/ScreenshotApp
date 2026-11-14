@@ -1,7 +1,7 @@
 # ScreenshotApp
 
 A small, modern screenshot tool for Windows 11. It lives in the notification area: press a hotkey, capture the
-full screen, a window or a region, and land in a clean editor to annotate, copy or save.
+full screen, a window, a scrolling window or a region, and land in a clean editor to annotate, copy or save.
 
 Built with C#, .NET 10 and WinUI 3 (Windows App SDK). It is unpackaged, so there is no installer and nothing to register.
 
@@ -12,6 +12,11 @@ Built with C#, .NET 10 and WinUI 3 (Windows App SDK). It is unpackaged, so there
 - Frozen, dimmed overlay with a crosshair and a live width × height readout, on every monitor, per-monitor-v2 DPI aware.
 - Press **Z** during a region capture for a zoom lens with a pixel-grid view, the cursor pixel's position and color;
   the **arrow keys** move the cursor one pixel at a time.
+- **Scrolling window**: hover over a scrollable area (a web page, a document, a list), click, and it is scrolled down
+  and captured to its end as one tall image. Sticky headers, side columns and bottom bars appear only once.
+  Press **Esc** or click **Stop** to end it early. It brings the window to the front first; in apps that can only be
+  scrolled with the mouse wheel it moves the cursor over the area, so leave the mouse alone until it is done.
+  The image can be up to about 16,000 pixels tall.
 - Each capture can open in the editor, go to the clipboard, and/or be saved to a folder (configurable in Settings;
   editor and clipboard by default).
 
@@ -51,6 +56,7 @@ Built with C#, .NET 10 and WinUI 3 (Windows App SDK). It is unpackaged, so there
 | --- | --- |
 | `Ctrl+Print` | Full screen (monitor under the cursor) |
 | `Alt+Print` | Window |
+| `Ctrl+Alt+Print` | Scrolling window |
 | `Print` | Region |
 | `Shift+Print` | Region again: the same rectangle as the last region capture, no selection step |
 | `Ctrl+Shift+Print` | Set / remove region (for screen sharing apps) |
@@ -153,7 +159,7 @@ This project was steered and tested by me and implemented with a coding agent.
 - Capture uses a GDI snapshot, so content protected by the system (some video players) can come out black.
 - Blur and Pixelate act on the captured image, not on other annotations drawn under them.
 - ARM64 is configured in the project but has not been built.
-- Out of scope for now: recording, OCR, scroll capture, uploads, history, pin-to-screen.
+- Out of scope for now: recording, OCR, uploads, history, pin-to-screen.
 
 ## License
 
