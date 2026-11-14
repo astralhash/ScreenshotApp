@@ -5,7 +5,7 @@ using Windows.Win32.UI.Input.KeyboardAndMouse;
 
 namespace ScreenshotApp.Capture;
 
-internal enum OverlayMode { Region, Window }
+internal enum OverlayMode { Region, Window, Scroll }
 
 /// <summary>
 /// Freezes the virtual screen, shows one <see cref="OverlayWindow"/> per monitor and runs the selection
@@ -25,6 +25,11 @@ internal sealed class CaptureOverlay
     private int _hoverIndex = -1; // index into _windows of the window under the cursor (window mode)
     private Point? _dragStart;
     private bool _done;
+    private ScrollTarget? _scrollHit;           // scroll mode: the scrollable area last found under the cursor
+    private bool _lookupBusy, _lookupPending;
+
+    /// <summary>Scroll mode: the area that was clicked (the caller owns and disposes it). Null otherwise.</summary>
+    public ScrollTarget? PickedScroll { get; private set; }
 
     public static bool IsActive { get; private set; }
 
@@ -63,13 +68,14 @@ internal sealed class CaptureOverlay
         try
         {
             // Enumerate windows first: the overlays are about to cover everything.
-            if (_mode == OverlayMode.Window) _windows = WindowEnumerator.GetVisibleWindows();
+            if (_mode != OverlayMode.Region) _windows = WindowEnumerator.GetVisibleWindows();
             _virtual = Monitors.VirtualScreen;
             _frozen = ScreenCapture.CaptureRect(_virtual);
 
             PInvoke.GetCursorPos(out var pt);
             Cursor = new Point(pt.X, pt.Y);
             UpdateHover();
+            if (_mode == OverlayMode.Scroll) RequestScrollLookup();
 
             var monitors = Monitors.GetAll();
             foreach (var m in monitors)
@@ -94,7 +100,11 @@ internal sealed class CaptureOverlay
         var moved = Clamp(p) != Cursor;
         Cursor = Clamp(p);
         if (moved) ColorCopied = false;
-        if (_mode == OverlayMode.Window) UpdateHover();
+        if (_mode != OverlayMode.Region)
+        {
+            UpdateHover();
+            if (_mode == OverlayMode.Scroll && moved) RequestScrollLookup();
+        }
         else if (_dragStart is { } start) Selection = Normalize(start, Cursor);
         InvalidateAll();
     }
@@ -113,7 +123,7 @@ internal sealed class CaptureOverlay
     public void OnMouseUp(Point p)
     {
         Cursor = Clamp(p);
-        if (_mode == OverlayMode.Window)
+        if (_mode != OverlayMode.Region)
         {
             UpdateHover();
             Confirm();
@@ -169,6 +179,11 @@ internal sealed class CaptureOverlay
     {
         if (_done) return;
         if (Selection is not { Width: >= 1, Height: >= 1 } sel) return;
+        if (_mode == OverlayMode.Scroll)
+        {
+            if (_hoverIndex >= 0) FinishScroll(_windows[_hoverIndex].Handle, Cursor);
+            return;
+        }
         if (_mode == OverlayMode.Window && _hoverIndex >= 0) FinishWindow(sel, _hoverIndex);
         else Finish(Crop(sel));
     }
@@ -192,9 +207,86 @@ internal sealed class CaptureOverlay
             {
                 Selection = r;
                 _hoverIndex = i;
+                // Scroll mode: the scrollable area under the cursor once it is known, else the whole window.
+                if (_scrollHit is { } hit && hit.Window == _windows[i].Handle && hit.Area.Contains(Cursor))
+                    Selection = Rectangle.Intersect(hit.Area, _virtual);
             }
             return;
         }
+    }
+
+    /// <summary>
+    /// Looks up the scrollable area under the cursor in the background (UI Automation calls are slow and
+    /// cross-process). One lookup at a time; moves meanwhile trigger one more for the latest position.
+    /// </summary>
+    private async void RequestScrollLookup()
+    {
+        if (_hoverIndex < 0 || _done) return;
+        if (_lookupBusy)
+        {
+            _lookupPending = true;
+            return;
+        }
+        _lookupBusy = true;
+        try
+        {
+            do
+            {
+                _lookupPending = false;
+                if (_hoverIndex < 0) break;
+                var hwnd = _windows[_hoverIndex].Handle;
+                var point = Cursor;
+                var hit = await Task.Run(() => ScrollAutomation.Find(hwnd, point));
+                if (_done)
+                {
+                    hit.Dispose();
+                    break;
+                }
+                _scrollHit?.Dispose();
+                _scrollHit = hit;
+                UpdateHover();
+                InvalidateAll();
+            } while (_lookupPending);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex);
+        }
+        finally
+        {
+            _lookupBusy = false;
+        }
+    }
+
+    /// <summary>Scroll mode: resolves the area at the click (reusing the hover lookup when it covers the point).</summary>
+    private async void FinishScroll(Windows.Win32.Foundation.HWND hwnd, Point point)
+    {
+        _done = true;
+        Teardown();
+        ScrollTarget? target = null;
+        try
+        {
+            if (_scrollHit is { } hit && hit.Window == hwnd && hit.Area.Contains(point))
+            {
+                target = hit;
+                _scrollHit = null;
+            }
+            else
+            {
+                target = await Task.Run(() => ScrollAutomation.Find(hwnd, point));
+            }
+        }
+        catch (Exception ex) { Log.Error(ex); }
+        _scrollHit?.Dispose();
+        _scrollHit = null;
+        if (target is null || target.Area.Width < 1 || target.Area.Height < 1)
+        {
+            target?.Dispose();
+            _tcs.TrySetResult(null);
+            return;
+        }
+        PickedScroll = target;
+        _tcs.TrySetResult(Crop(target.Area));
     }
 
     private Point Clamp(Point p) => new(
@@ -252,6 +344,8 @@ internal sealed class CaptureOverlay
     {
         _done = true;
         Teardown();
+        _scrollHit?.Dispose();
+        _scrollHit = null;
         _tcs.TrySetResult(result);
     }
 

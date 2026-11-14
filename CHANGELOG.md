@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Capture: scrolling window capture (Ctrl+Alt+Print Screen) captures a scrollable area down to its end
+
 ## 0.3.2
 
 - Share Region: when giving control the clicks land in the correct spot

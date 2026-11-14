@@ -75,7 +75,7 @@ internal static class WindowCapture
     /// Screen position of the frame's top-left pixel. Depending on the window the frame covers its whole window
     /// rect (including the invisible resize border) or just its visible frame; the frame size tells which.
     /// </summary>
-    private static Point FrameOrigin(HWND hwnd, int width, int height)
+    internal static Point FrameOrigin(HWND hwnd, int width, int height)
     {
         PInvoke.GetWindowRect(hwnd, out var wr);
         if (wr.right - wr.left == width && wr.bottom - wr.top == height) return new Point(wr.left, wr.top);

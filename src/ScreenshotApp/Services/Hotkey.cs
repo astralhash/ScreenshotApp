@@ -3,7 +3,7 @@ using Windows.Win32.UI.Input.KeyboardAndMouse;
 namespace ScreenshotApp.Services;
 
 /// <summary>What a global hotkey can trigger.</summary>
-internal enum HotkeyAction { FullScreen, Window, Region, RegionRepeat, ShareRegion }
+internal enum HotkeyAction { FullScreen, Window, ScrollingWindow, Region, RegionRepeat, ShareRegion }
 
 internal static class HotkeyActions
 {
@@ -13,6 +13,7 @@ internal static class HotkeyActions
     {
         HotkeyAction.FullScreen => "Ctrl+Print",
         HotkeyAction.Window => "Alt+Print",
+        HotkeyAction.ScrollingWindow => "Ctrl+Alt+Print",
         HotkeyAction.Region => "Print",
         HotkeyAction.ShareRegion => "Ctrl+Shift+Print",
         _ => "Shift+Print",
@@ -22,6 +23,7 @@ internal static class HotkeyActions
     {
         HotkeyAction.FullScreen => "Full screen (monitor under the cursor)",
         HotkeyAction.Window => "Window",
+        HotkeyAction.ScrollingWindow => "Scrolling window",
         HotkeyAction.Region => "Region",
         HotkeyAction.ShareRegion => "Set / remove region (for screen sharing apps)",
         _ => "Region (repeat the last one)",

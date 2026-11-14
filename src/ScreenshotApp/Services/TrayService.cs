@@ -17,6 +17,7 @@ internal enum TrayCommand
     ShareRegion,
     StopSharing,
     Update,
+    CaptureScrolling,
 }
 
 /// <summary>Notification-area icon with a context menu and balloon notifications.</summary>
@@ -106,6 +107,7 @@ internal sealed unsafe class TrayService : IDisposable
             PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (string?)null);
             Append(menu, TrayCommand.CaptureRegion, "Capture Region", HotkeyAction.Region);
             Append(menu, TrayCommand.CaptureWindow, "Capture Window", HotkeyAction.Window);
+            Append(menu, TrayCommand.CaptureScrolling, "Capture Scrolling Window", HotkeyAction.ScrollingWindow);
             Append(menu, TrayCommand.CaptureFullScreen, "Capture Full Screen", HotkeyAction.FullScreen);
             PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (string?)null);
             if (Sharing)

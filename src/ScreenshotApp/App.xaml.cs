@@ -43,6 +43,20 @@ public partial class App : Application
             Exit();
             return;
         }
+        if (Environment.GetCommandLineArgs().Contains("--selftest-scroll", StringComparer.OrdinalIgnoreCase))
+        {
+            try { ScrollSelfTest.Run(); }
+            catch (Exception ex) { Log.Error(ex); }
+            Exit();
+            return;
+        }
+        if (Environment.GetCommandLineArgs().Contains("--selftest-scroll-live", StringComparer.OrdinalIgnoreCase))
+        {
+            try { await ScrollSelfTest.RunLiveAsync(); }
+            catch (Exception ex) { Log.Error(ex); }
+            Exit();
+            return;
+        }
         if (Environment.GetCommandLineArgs().Contains("--selftest-share", StringComparer.OrdinalIgnoreCase))
         {
             try { await ShareSelfTest.RunAsync(); }
@@ -113,6 +127,7 @@ public partial class App : Application
             {
                 HotkeyAction.FullScreen => CaptureFullScreen,
                 HotkeyAction.Window => CaptureWindow,
+                HotkeyAction.ScrollingWindow => CaptureScrolling,
                 HotkeyAction.Region => CaptureRegion,
                 HotkeyAction.ShareRegion => ToggleShareRegion,
                 _ => CaptureRegionRepeat,
@@ -145,6 +160,7 @@ public partial class App : Application
             case TrayCommand.OpenEditor: OpenEditor(); break;
             case TrayCommand.CaptureRegion: CaptureRegion(); break;
             case TrayCommand.CaptureWindow: CaptureWindow(); break;
+            case TrayCommand.CaptureScrolling: CaptureScrolling(); break;
             case TrayCommand.CaptureFullScreen: CaptureFullScreen(); break;
             case TrayCommand.Settings: OpenSettings(); break;
             case TrayCommand.ShareRegion: ShareRegion(); break;
@@ -243,17 +259,29 @@ public partial class App : Application
 
     private async void CaptureWindow() => await RunDuckedAsync(() => RunOverlayAsync(OverlayMode.Window));
 
+    private async void CaptureScrolling() => await RunDuckedAsync(() => RunOverlayAsync(OverlayMode.Scroll));
+
     /// <summary>Runs the selection overlay; true when something was captured (false when cancelled or it failed).</summary>
     private async Task<bool> RunOverlayAsync(OverlayMode mode)
     {
-        if (CaptureOverlay.IsActive) return false;
+        if (CaptureOverlay.IsActive || ScrollCapture.IsActive) return false;
+        if (mode == OverlayMode.Scroll && !ScrollFrameSource.IsSupported)
+        {
+            _tray?.ShowBalloon("Scrolling capture unavailable", "Scrolling capture needs Windows 10 2004 or later.");
+            return false;
+        }
         try
         {
             // While a region is shared, viewers would see the dimming and crosshair: leave them out.
             bool sharing = _share is not null;
-            var image = await new CaptureOverlay(mode, dim: !sharing && _settings.Current.DimOverlay, crosshair: !sharing).RunAsync();
+            var overlay = new CaptureOverlay(mode, dim: !sharing && _settings.Current.DimOverlay, crosshair: !sharing);
+            var image = await overlay.RunAsync();
             if (image is null) return false;
             if (mode == OverlayMode.Region) RememberRegion(image);
+            if (overlay.PickedScroll is { } target)
+            {
+                using (target) image = await ScrollCapture.RunAsync(target) ?? image;
+            }
             HandleCapture(image);
             return true;
         }
@@ -286,6 +314,7 @@ public partial class App : Application
             {
                 CaptureKind.FullScreen => TryCaptureFullScreen(),
                 CaptureKind.Window => await RunOverlayAsync(OverlayMode.Window),
+                CaptureKind.Scrolling => await RunOverlayAsync(OverlayMode.Scroll),
                 _ => await RunOverlayAsync(OverlayMode.Region),
             };
         }
