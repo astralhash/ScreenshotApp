@@ -35,6 +35,10 @@ internal static class ScrollCapture
         ScrollToolbar? toolbar = null;
         ScrollFrameSource? source = null;
         bool stop = false;
+        // Esc is latched by a fast background poll: the loop below spends most of its time scrolling, settling
+        // and stitching, and a short tap checked only now and then was missed (the capture went on for seconds).
+        int escPressed = 0;
+        using var escWatch = new System.Threading.Timer(_ => { if (EscDown()) Volatile.Write(ref escPressed, 1); }, null, 0, 15);
         try
         {
             await BringToFrontAsync(target);
@@ -44,7 +48,7 @@ internal static class ScrollCapture
             toolbar.StopRequested += () => stop = true;
 
             source = new ScrollFrameSource(target.Window, target.Area);
-            bool Stopping() => stop || EscDown() || WheelCursorMoved();
+            bool Stopping() => stop || Volatile.Read(ref escPressed) != 0 || WheelCursorMoved();
 
             byte[]? first = await NextFrameAsync(source, 0, Stopping);
             if (first is null) return null;
@@ -91,6 +95,7 @@ internal static class ScrollCapture
                     reason = "window changed size";
                     break;
                 }
+                if (Stopping()) { reason = "stopped"; break; } // pressed while it settled: skip the stitch
                 var result = await Task.Run(() => stitcher.Add(frame));
                 await DumpAsync(frame, captured, step + 1);
                 Log.Info($"Scroll capture step {step + 1}: {method} x{amounts[method]:0.##} → {result} ({stitcher.LastInfo})");
@@ -178,7 +183,10 @@ internal static class ScrollCapture
             await Task.Delay(PollMs);
         }
         while (Environment.TickCount64 - source.LastFrameTick < QuietMs && Environment.TickCount64 - start < SettleTimeoutMs)
+        {
+            if (stopping()) return null;
             await Task.Delay(PollMs);
+        }
         if (countBefore == 0 && source.FrameCount == 0)
         {
             // The first frame can take a moment; give it up to a second more.
