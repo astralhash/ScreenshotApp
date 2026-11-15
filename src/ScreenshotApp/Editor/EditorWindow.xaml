@@ -280,6 +280,8 @@
                         <StackPanel Spacing="4">
                             <Grid Width="160" Height="90" CornerRadius="4" Background="Transparent"
                                   Tag="{x:Bind}" ContextRequested="Thumb_ContextRequested"
+                                  CanDrag="True" DragStarting="Thumb_DragStarting" DropCompleted="Thumb_DropCompleted"
+                                  Tapped="Thumb_Tapped"
                                   PointerEntered="Thumb_PointerEntered" PointerExited="Thumb_PointerExited">
                                 <Image Source="{x:Bind Thumbnail, Mode=OneWay}" Stretch="Uniform" />
                                 <Button Tag="{x:Bind}" Click="RemoveShot_Click" Visibility="Collapsed"

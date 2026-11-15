@@ -343,9 +343,62 @@ public sealed partial class EditorWindow : Window
         }
     }
 
+    /// <summary>True while a film-strip clip is being dragged out, so dropping it back on the editor does nothing.</summary>
+    private bool _draggingClip;
+
+    /// <summary>
+    /// Dragging a thumbnail out offers the clip as an image file (rendered with its edits, configured format and
+    /// filename pattern, into a temp folder) that Explorer or another app copies to where it is dropped.
+    /// </summary>
+    private async void Thumb_DragStarting(UIElement sender, DragStartingEventArgs args)
+    {
+        if (sender is not FrameworkElement { Tag: EditorDocument clip }) { args.Cancel = true; return; }
+        var deferral = args.GetDeferral();
+        try
+        {
+            var file = await StorageFile.GetFileFromPathAsync(await ViewModel.ExportForDragAsync(clip));
+            args.Data.RequestedOperation = DataPackageOperation.Copy;
+            args.Data.SetStorageItems([file], readOnly: true);
+            args.AllowedOperations = DataPackageOperation.Copy;
+            _draggingClip = true;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex);
+            ViewModel.ShowStatus("Could not export clip: " + ex.Message);
+            args.Cancel = true;
+        }
+        finally
+        {
+            deferral.Complete();
+        }
+    }
+
+    /// <summary>CanDrag on the thumbnail takes the pointer press from the list item, so a click selects here.</summary>
+    private void Thumb_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        // The × button inside the thumbnail removes the clip; its tap must not select it again.
+        if (sender is FrameworkElement { Tag: EditorDocument clip } && ViewModel.Shots.Contains(clip)
+            && !IsInButton(e.OriginalSource as DependencyObject, (DependencyObject)sender))
+            ViewModel.SelectedShot = clip;
+    }
+
+    private static bool IsInButton(DependencyObject? element, DependencyObject stop)
+    {
+        for (; element is not null && element != stop; element = VisualTreeHelper.GetParent(element))
+            if (element is ButtonBase) return true;
+        return false;
+    }
+
+    private void Thumb_DropCompleted(UIElement sender, DropCompletedEventArgs args)
+    {
+        _draggingClip = false;
+        if (args.DropResult != DataPackageOperation.None) ViewModel.ShowStatus("Saved by drag and drop");
+    }
+
     private void Root_DragOver(object sender, DragEventArgs e)
     {
-        if (!e.DataView.Contains(StandardDataFormats.StorageItems)) return;
+        if (_draggingClip || !e.DataView.Contains(StandardDataFormats.StorageItems)) return;
         e.AcceptedOperation = DataPackageOperation.Copy;
         e.DragUIOverride.Caption = "Add as clip";
         e.DragUIOverride.IsGlyphVisible = false;
@@ -353,7 +406,7 @@ public sealed partial class EditorWindow : Window
 
     private async void Root_Drop(object sender, DragEventArgs e)
     {
-        if (!e.DataView.Contains(StandardDataFormats.StorageItems)) return;
+        if (_draggingClip || !e.DataView.Contains(StandardDataFormats.StorageItems)) return;
         var deferral = e.GetDeferral();
         try
         {

@@ -17,16 +17,20 @@ internal static partial class ImageSaver
 
     /// <summary>Saves to the configured folder using the filename pattern; returns the full path.</summary>
     /// <param name="png">See <see cref="SaveAsync(CapturedImage, string, bool, byte[])"/>.</param>
-    public static async Task<string> SaveAsync(CapturedImage image, AppSettings settings, byte[]? png = null)
+    public static Task<string> SaveAsync(CapturedImage image, AppSettings settings, byte[]? png = null) =>
+        SaveAsync(image, settings, settings.SaveFolder, png);
+
+    /// <summary>Saves to <paramref name="folder"/> using the configured format and filename pattern; returns the full path.</summary>
+    public static async Task<string> SaveAsync(CapturedImage image, AppSettings settings, string folder, byte[]? png = null)
     {
         bool jpg = settings.ImageFormat.Equals("jpg", StringComparison.OrdinalIgnoreCase);
         string name = ExpandPattern(settings.FilenamePattern, DateTime.Now);
         foreach (var c in Path.GetInvalidFileNameChars()) name = name.Replace(c, '_');
 
-        Directory.CreateDirectory(settings.SaveFolder);
-        string path = Path.Combine(settings.SaveFolder, name + (jpg ? ".jpg" : ".png"));
+        Directory.CreateDirectory(folder);
+        string path = Path.Combine(folder, name + (jpg ? ".jpg" : ".png"));
         for (int i = 2; File.Exists(path); i++)
-            path = Path.Combine(settings.SaveFolder, $"{name} ({i}){(jpg ? ".jpg" : ".png")}");
+            path = Path.Combine(folder, $"{name} ({i}){(jpg ? ".jpg" : ".png")}");
 
         await SaveAsync(image, path, jpg, png);
         return path;

@@ -462,6 +462,33 @@ internal sealed partial class EditorViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Writes the clip as it is exported (configured format, filename pattern) into a fresh temp folder for a
+    /// drag to Explorer, which copies it from there. Older drag folders are deleted on the way.
+    /// </summary>
+    public async Task<string> ExportForDragAsync(EditorDocument shot)
+    {
+        string root = Path.Combine(Path.GetTempPath(), "ScreenshotApp-drag");
+        try
+        {
+            if (Directory.Exists(root))
+                foreach (var dir in Directory.GetDirectories(root))
+                    if (Directory.GetCreationTimeUtc(dir) < DateTime.UtcNow.AddHours(-1))
+                        try { Directory.Delete(dir, recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
+        catch (Exception ex) { Log.Error(ex); }
+
+        try
+        {
+            var (flat, png) = await FlattenAsync(shot);
+            return await ImageSaver.SaveAsync(flat, _settings.Current, Path.Combine(root, Guid.NewGuid().ToString("N")), png);
+        }
+        finally
+        {
+            ReleaseIfIdle(shot);
+        }
+    }
+
+    /// <summary>
     /// The clip as it is exported. One without edits is its capture as it stands, so that comes with the PNG the
     /// clip already holds, and neither the render nor a second PNG encode is needed.
     /// </summary>
