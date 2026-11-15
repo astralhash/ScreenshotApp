@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.1
+
+- Editor: drag a clip from the film strip into Explorer or onto the desktop to save it there
+- Capture: Esc stops a scrolling capture immediately
+
 ## 0.4.0
 
 - Capture: scrolling window capture (Ctrl+Alt+Print Screen, tray menu, editor start page) captures a scrollable area down to its end

@@ -22,7 +22,8 @@ Built with C#, .NET 10 and WinUI 3 (Windows App SDK). It is unpackaged, so there
 
 **Editor**
 - One window with a film strip of clips along the bottom (newest on the left). Right-click a clip for
-  Copy / Save / Save As / Close / Remove all, or close it with the × on its thumbnail.
+  Copy / Save / Save As / Close / Remove all, or close it with the × on its thumbnail. Drag a thumbnail into an
+  Explorer window or onto the desktop to save it there as an image file.
 - Unsaved clips and their edits are kept across restarts until you close them.
 - Start page when there are no clips: open an image file, or take a capture. You can also drag PNG, JPEG or BMP files into the window.
 - Tools: Select/Move, Arrow, Rectangle, Line, Pen, Highlighter, Text, Numbered step, Blur/Pixelate/Solid fill, Crop.
